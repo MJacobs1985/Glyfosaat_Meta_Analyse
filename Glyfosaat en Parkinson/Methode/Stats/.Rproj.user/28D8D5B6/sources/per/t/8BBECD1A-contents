@@ -1,0 +1,4378 @@
+#### CLEAR ENVIRONMENT -----
+rm(list = ls())
+#### CHANGE OPTIONS ----
+#options(digits=10)
+options(scipen=999)
+#### LOAD LIBRARIES -----
+library(readxl)
+library(tidyverse)
+library(Hmisc)
+library(tidytext)
+library(stringr)
+library(metafor)
+library(meta)
+library(dmetar)
+
+#### LOAD AND WRANGLE DATA ----
+df <- read_excel("~/MSJ/Projects/2025/STAF/Pesticiden en Parkinson/Methode/Data/Data_Extracted_from_Review2.xlsx")
+colnames(df) = gsub(" ", "_", colnames(df))
+colnames(df)
+sapply(df, class)
+
+table(is.na(df$Review_Risk_Estimate))
+df<-df%>%
+  mutate(Review_Risk_Estimate = as.numeric (Review_Risk_Estimate), 
+         Review_Risk_Estimate_Low = as.numeric (Review_Risk_Estimate_Low), 
+         Review_Risk_Estimate_High = as.numeric (Review_Risk_Estimate_High), 
+         Study_Author_Year = paste(Study_Author,Study_Year, sep=","), 
+         Review_Author_Year = paste(Review_Author,Review_Year, sep=","), 
+         Review_Total_N = as.numeric(Study_Risk_Patients) + as.numeric(Study_Risk_Controls), 
+         Review_Risk_Estimate_Difference = Review_Risk_Estimate_High - Review_Risk_Estimate_Low, 
+         Study_Year = as.numeric(Study_Year), 
+         Study_Adjustments_Binary = case_when(is.na(Study_Adjustments) ~ 'No', 
+                                              TRUE ~ 'Yes'), 
+         Study_Author_Year_Risk = paste(Study_Author_Year,Study_Risk_Factor, sep=","))
+
+table(is.na(df$Review_Risk_Estimate))
+df%>%
+  filter(is.na(Review_Risk_Estimate))%>%
+  select(Review_Author_Year, Study_Author_Year, Study_Risk_Factor, Review_Risk_Estimate)%>%
+  print(n=253)
+
+df%>%
+  select(Study_Adjustments, Study_Adjustments_Binary)%>%
+  print(n=500)
+
+
+df%>%
+  select(Review_Year)%>%
+  distinct()%>%print(n=95)
+
+#### TABULAR EXPLORATION -----
+DataExplorer::introduce(df)
+colnames(df)
+
+df%>%
+  summarise_all(list(n_distinct))%>%
+  unlist()
+df%>%
+  select(Review_Author_Year, Review_Risk_Factors, 
+         Study_Author_Year, Study_Risk_Factor, 
+         Study_Country, Review_Year, Study_Year)%>%
+  summarise_all(n_distinct)%>%
+  unlist()
+
+df%>%
+  arrange(Review_Author_Year)%>%
+  select(Review_Author_Year)%>%
+  drop_na()%>%
+  distinct()%>%
+  arrange()%>%
+  print(n=127)
+
+table(df$Review_Year)
+table(df$Study_Year)
+
+df%>%
+  select(Review_Year)%>%
+  distinct()%>%print(n=95)
+
+df%>%
+  group_by(Review_Risk_Factors)%>%
+  select(Review_Author_Year)%>%
+  distinct()%>%
+  count()%>%
+  select(Review_Risk_Factors, n)%>%
+  ungroup()%>%
+  arrange(desc(n))%>%
+  slice_head(n=10)
+
+df%>%
+  filter(Review_Risk_Factors == "Pesticides")%>%
+  select(Review_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Review_Risk_Factors == "Pesticides")%>%
+  select(Review_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Review_Risk_Factors == "Pesticides")%>%
+  select(Study_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Study_Risk_Factor == "Pesticides")%>%
+  select(Study_Author_Year)%>%
+  distinct()
+
+
+df%>%
+  filter(Review_Risk_Factors == "Pesticides")%>%
+  select(Study_Author_Year)%>%
+  distinct()%>%
+  print(n=30)
+df%>%
+  group_by(Review_Risk_Factors)%>%
+  select(Study_Author_Year)%>%
+  distinct()%>%
+  count()%>%
+  select(Review_Risk_Factors, n)%>%
+  ungroup()%>%
+  arrange(desc(n))%>%
+  print(n=10)
+
+
+df%>%
+  filter(Study_Risk_Factor == "Pesticides")%>%
+  select(Study_Author_Year)%>%
+  distinct()%>%
+  print(n=30)
+df%>%
+  group_by(Study_Risk_Factor)%>%
+  select(Study_Author_Year)%>%
+  distinct()%>%
+  count()%>%
+  select(Study_Risk_Factor, n)%>%
+  ungroup()%>%
+  arrange(desc(n))%>%
+  print(n=10)
+
+
+
+table(df$Review_Primary_Model)
+df%>%
+  select(Review_Primary_Model, Review_Author_Year)%>%
+  distinct()%>%
+  group_by(Review_Primary_Model)%>%
+  count(Review_Primary_Model)%>%
+  drop_na()
+table(df$Review_Risk_of_bias)
+df%>%
+  select(Review_Risk_of_bias, Review_Author_Year)%>%
+  distinct()%>%
+  group_by(Review_Risk_of_bias)%>%
+  count(Review_Risk_of_bias)%>%
+  drop_na()
+table(df$Review_Publication_Bias)
+df%>%
+  select(Review_Publication_Bias, Review_Author_Year)%>%
+  distinct()%>%
+  group_by(Review_Publication_Bias)%>%
+  count(Review_Publication_Bias)%>%
+  drop_na()
+table(df$Review_Meta_Regression)
+df%>%
+  select(Review_Meta_Regression, Review_Author_Year)%>%
+  distinct()%>%
+  group_by(Review_Meta_Regression)%>%
+  count(Review_Meta_Regression)%>%
+  drop_na()
+
+
+length(unique(df$Study_Country))
+table(df$Study_Country)
+df%>%
+  select(Study_Author_Year, Study_Country)%>%
+  distinct()%>%
+  drop_na()%>%
+  group_by(Study_Country)%>%
+  select(Study_Country)%>%
+  count()%>%
+  arrange(desc(n))
+df%>%
+  select(Study_Country, Study_Author_Year)%>%
+  distinct()%>%
+  group_by(Study_Country)%>%
+  count(Study_Country)%>%
+  drop_na()%>%
+  arrange(desc(n))%>%
+  print(n=length(unique(df$Study_Country)))
+df%>%
+  filter(Study_Country=="The Netherlands")%>%
+  select(Study_Author_Year)%>%
+  distinct()
+
+
+length(unique(df$Study_Design))
+table(df$Study_Design)
+df%>%
+  select(Study_Author_Year, Study_Design)%>%
+  distinct()%>%
+  drop_na()%>%
+  group_by(Study_Design)%>%
+  select(Study_Design)%>%
+  count()%>%
+  arrange(desc(n))
+
+
+table(is.na(df$Study_period))
+df%>%
+  select(Study_period)%>%
+  filter(str_detect(Study_period, "-"))%>%
+  count()
+
+df%>%
+  select(Study_Author_Year, Study_period)%>%
+  drop_na()%>%
+  select(Study_Author_Year)%>%
+  distinct()
+
+
+df%>%
+  select(Study_Author_Year, Study_period)%>%
+  drop_na()%>%
+  distinct()
+
+df%>%
+  select(Study_period)%>%
+  filter(str_detect(Study_period, "-"))%>%
+  drop_na()%>%
+  separate_wider_delim(Study_period, "-", names = c("Start", "End"))%>%
+  mutate(Period = as.numeric(End) - as.numeric(Start))
+
+table(df$Study_period)
+
+df%>%
+  select(Review_Author_Year, Study_Author_Year)%>%
+  group_by(Review_Author_Year, Study_Author_Year)%>%
+  distinct()%>%
+  arrange(desc(Study_Author_Year))%>%
+  select(Study_Author_Year)%>%
+  group_by(Study_Author_Year)%>%
+  count()%>%
+  arrange(desc(n))
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Review_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Review_Author_Year, Review_Risk_Factors)%>%
+  distinct()
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Study_Risk_Factor)%>%
+  distinct()
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Review_Risk_Factors)%>%
+  group_by(Review_Risk_Factors)%>%
+  count()
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Review_Risk_Factors)%>%
+  group_by(Review_Risk_Factors)%>%
+  count()
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997" & 
+         Review_Risk_Factors =="Pesticides")%>%
+  select(Review_Author_Year, Study_Risk_Factor)
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997" & 
+           Review_Risk_Factors =="Pesticides")%>%
+  select(Review_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997" & 
+           Review_Risk_Factors =="Pesticides")%>%
+  select(Review_Author_Year, Study_Risk_Factor)%>%
+  distinct()
+
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Study_Risk_Factor, Review_Author_Year)%>%
+  distinct()%>%
+  print(n=30)
+df%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Review_Risk_Factors, Review_Author_Year)%>%
+  distinct()%>%
+  print(n=30)
+
+df%>%
+  filter(Study_Risk_Factor =="Pesticides")%>%
+  select(Study_Author_Year, Review_Risk_Factors, Study_Risk_Factor)%>%
+  filter(Study_Author_Year == "Liou,1997")
+df%>%
+  filter(Study_Risk_Factor =="Alcohol")%>%
+  select(Study_Author_Year, Review_Risk_Factors, Study_Risk_Factor)%>%
+  filter(Study_Author_Year == "Hernan,2003")
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year, Review_Risk_Factors, Study_Risk_Factor)%>%
+  filter(Study_Author_Year == "Liou,1997")
+df%>%
+  filter(Review_Risk_Factors =="Alcohol")%>%
+  select(Study_Author_Year, Review_Risk_Factors, Study_Risk_Factor)%>%
+  filter(Study_Author_Year == "Hernan,2003")
+
+df%>%
+  select(Study_Author_Year_Risk)%>%
+  distinct()%>%
+  count()
+
+df%>%
+  filter(Study_Author_Year_Risk =="Liou,1997,Pesticides")%>%
+  select(Review_Author_Year, Study_Risk_Factor, Review_Risk_Factors)
+
+df%>%
+  select(Review_Author_Year, Study_Author_Year_Risk)%>%
+  group_by(Review_Author_Year, Study_Author_Year_Risk)%>%
+  distinct()%>%
+  select(Study_Author_Year_Risk)%>%
+  group_by(Study_Author_Year_Risk)%>%
+  count()%>%
+  arrange(desc(n))
+
+df%>%
+  filter(Study_Author_Year =="Liou,1997")%>%
+  select(Review_Author_Year, Study_Risk_Factor)%>%
+  filter(Study_Risk_Factor=="Pesticides")%>%
+  distinct()
+
+df%>%
+  filter(Study_Author_Year =="Liou,1997")%>%
+  select(Review_Author_Year, Review_Risk_Factors)%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  distinct()
+
+df%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Factors)%>%
+  distinct()%>%
+  group_by
+
+df%>%
+  mutate(Study_Author_Year_Risk = paste(Study_Author_Year,Review_Risk_Factors, sep=","))%>%
+  select(Review_Author_Year, Study_Author_Year_Risk)%>%
+  group_by(Review_Author_Year, Study_Author_Year_Risk)%>%
+  distinct()%>%
+  select(Study_Author_Year_Risk)%>%
+  group_by(Study_Author_Year_Risk)%>%
+  count()%>%
+  arrange(desc(n))
+
+df%>%
+  filter(Study_Author_Year == "Liou,1997" & Review_Risk_Factors=="Pesticides")%>%
+  select(Review_Author_Year,Study_Risk_Factor, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Review_Risk_Metric)
+  distinct()
+
+
+df%>%
+  filter(Study_Author_Year == "Hertzman,1994" & Review_Risk_Factors=="Pesticides")%>%
+  select(Review_Author_Year,Study_Risk_Factor, Review_Risk_Metric, Review_Risk_Estimate, 
+        Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Study_Risk_Factor, Review_Risk_Metric)
+  distinct()
+
+df%>%
+  filter(Review_Risk_of_bias =="NOS")%>%
+  select(Study_Author_Year, NOS_Total_Study_Quality_Score)
+
+table(df$NOS_Total_Study_Quality_Score)
+  
+df%>%
+  mutate(NOS_Total_Study_Quality_Score = as.numeric (NOS_Total_Study_Quality_Score))%>%
+  summarise(mean = mean(NOS_Total_Study_Quality_Score, na.rm=TRUE), 
+            sd= sd(NOS_Total_Study_Quality_Score, na.rm=TRUE),  
+            var= var(NOS_Total_Study_Quality_Score, na.rm=TRUE), 
+            min = min(NOS_Total_Study_Quality_Score, na.rm=TRUE),  
+            q10 = quantile(NOS_Total_Study_Quality_Score, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(NOS_Total_Study_Quality_Score, probs = 0.9, na.rm=TRUE), 
+            max= max(NOS_Total_Study_Quality_Score, na.rm=TRUE))
+df%>%
+  select(NOS_Total_Study_Quality_Score)%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  group_by(NOS_Total_Study_Quality_Score)%>%
+  count(NOS_Total_Study_Quality_Score) %>%
+  print(n=28)
+  
+
+df%>%
+  group_by(Study_Design)%>%
+  select(Review_Risk_Metric)%>%
+  count(Review_Risk_Metric)%>%
+  print(n=26)
+
+df%>%
+  select(Review_Risk_Metric)%>%
+  count(Review_Risk_Metric)%>%
+  arrange(desc(n))
+
+df%>%
+  select(Review_Risk_Metric, Review_Risk_Estimate)%>%
+  drop_na()%>%
+  group_by(Review_Risk_Metric)%>%
+  summarise(mean = mean(Review_Risk_Estimate, na.rm=TRUE), 
+            sd= sd(Review_Risk_Estimate, na.rm=TRUE),  
+            var= var(Review_Risk_Estimate, na.rm=TRUE), 
+            min = min(Review_Risk_Estimate, na.rm=TRUE),  
+            q10 = quantile(Review_Risk_Estimate, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(Review_Risk_Estimate, probs = 0.9, na.rm=TRUE), 
+            max= max(Review_Risk_Estimate, na.rm=TRUE))
+
+
+df%>%
+  select(Review_Risk_Metric, Review_Risk_Estimate_Low)%>%
+  drop_na()%>%
+  group_by(Review_Risk_Metric)%>%
+  summarise(mean = mean(Review_Risk_Estimate_Low, na.rm=TRUE), 
+            sd= sd(Review_Risk_Estimate_Low, na.rm=TRUE),  
+            var= var(Review_Risk_Estimate_Low, na.rm=TRUE), 
+            min = min(Review_Risk_Estimate_Low, na.rm=TRUE),  
+            q10 = quantile(Review_Risk_Estimate_Low, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(Review_Risk_Estimate_Low, probs = 0.9, na.rm=TRUE), 
+            max= max(Review_Risk_Estimate_Low, na.rm=TRUE))
+
+df%>%
+  select(Review_Risk_Metric, Review_Risk_Estimate_High)%>%
+  drop_na()%>%
+  group_by(Review_Risk_Metric)%>%
+  summarise(mean = mean(Review_Risk_Estimate_High, na.rm=TRUE), 
+            sd= sd(Review_Risk_Estimate_High, na.rm=TRUE),  
+            var= var(Review_Risk_Estimate_High, na.rm=TRUE), 
+            min = min(Review_Risk_Estimate_High, na.rm=TRUE),  
+            q10 = quantile(Review_Risk_Estimate_High, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(Review_Risk_Estimate_High, probs = 0.9, na.rm=TRUE), 
+            max= max(Review_Risk_Estimate_High, na.rm=TRUE))
+
+
+
+
+df%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  select(Review_Risk_Metric, Review_Risk_Estimate)%>%
+  drop_na()%>%
+  group_by(Review_Risk_Metric)%>%
+  summarise(mean = mean(Review_Risk_Estimate, na.rm=TRUE), 
+            sd= sd(Review_Risk_Estimate, na.rm=TRUE),  
+            var= var(Review_Risk_Estimate, na.rm=TRUE), 
+            min = min(Review_Risk_Estimate, na.rm=TRUE),  
+            q10 = quantile(Review_Risk_Estimate, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(Review_Risk_Estimate, probs = 0.9, na.rm=TRUE), 
+            max= max(Review_Risk_Estimate, na.rm=TRUE))
+df%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  select(Review_Risk_Metric, Review_Risk_Estimate_Low)%>%
+  drop_na()%>%
+  group_by(Review_Risk_Metric)%>%
+  summarise(mean = mean(Review_Risk_Estimate_Low, na.rm=TRUE), 
+            sd= sd(Review_Risk_Estimate_Low, na.rm=TRUE),  
+            var= var(Review_Risk_Estimate_Low, na.rm=TRUE), 
+            min = min(Review_Risk_Estimate_Low, na.rm=TRUE),  
+            q10 = quantile(Review_Risk_Estimate_Low, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(Review_Risk_Estimate_Low, probs = 0.9, na.rm=TRUE), 
+            max= max(Review_Risk_Estimate_Low, na.rm=TRUE))
+df%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  select(Review_Risk_Metric, Review_Risk_Estimate_High)%>%
+  drop_na()%>%
+  group_by(Review_Risk_Metric)%>%
+  summarise(mean = mean(Review_Risk_Estimate_High, na.rm=TRUE), 
+            sd= sd(Review_Risk_Estimate_High, na.rm=TRUE),  
+            var= var(Review_Risk_Estimate_High, na.rm=TRUE), 
+            min = min(Review_Risk_Estimate_High, na.rm=TRUE),  
+            q10 = quantile(Review_Risk_Estimate_High, probs = 0.1, na.rm=TRUE), 
+            q90 = quantile(Review_Risk_Estimate_High, probs = 0.9, na.rm=TRUE), 
+            max= max(Review_Risk_Estimate_High, na.rm=TRUE))
+
+
+df%>%
+  select(Study_Adjustments_Binary)%>%
+  table()
+
+
+df%>%
+  mutate(colB = tolower(Study_Adjustments))%>%
+  select(colB, Review_Author_Year, Study_Author_Year)%>%
+  add_rownames(var = "id")%>%
+  drop_na()%>%
+  unnest_tokens(Confounder, colB, token = stringr::str_split, pattern = ",")%>%
+  mutate(Confounder = stringr::str_squish(Confounder))%>%
+  drop_na()%>%
+  distinct()%>%
+  count(Confounder)%>%
+  arrange(desc(n))%>%
+  print(n=200)
+
+df%>%
+  mutate(colB = tolower(Study_Adjustments))%>%
+  select(colB, Review_Author_Year, Study_Author_Year)%>%
+  add_rownames(var = "id")%>%
+  drop_na()%>%
+  unnest_tokens(Confounder, colB, token = stringr::str_split, pattern = ",")%>%
+  mutate(Confounder = stringr::str_squish(Confounder))%>%
+  drop_na()%>%
+  distinct()%>%
+  group_by(Confounder, Study_Author_Year) %>%
+  arrange(desc(Confounder)) %>%
+  filter(row_number()==1)%>%
+  ungroup()%>%
+  count(Confounder)%>%
+  arrange(desc(n))%>%
+  print(n=200)
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Review_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year)%>%
+  distinct()
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Review_Risk_of_bias)%>%
+  group_by(Review_Risk_of_bias)%>%
+  count()
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(NOS_Total_Study_Quality_Score)%>%
+  group_by(NOS_Total_Study_Quality_Score)%>%
+  count()
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  mutate(NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(!is.na(NOS_Total_Study_Quality_Score))%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, NOS_Total_Study_Quality_Score)%>%
+  arrange(Study_Author_Year)%>%
+  print(n=25)
+
+
+df%>%
+  filter(Review_Risk_of_bias=="NOS")%>%
+  select(Review_Risk_Factors)%>%
+  group_by(Review_Risk_Factors)%>%
+  count()%>%
+  arrange(desc(n))%>%
+  print(n=67)
+
+df%>%
+  filter(Review_Risk_Factors =="Diabetes")%>%
+  mutate(NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(!is.na(NOS_Total_Study_Quality_Score))%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, NOS_Total_Study_Quality_Score)%>%
+  distinct()%>%
+  count(Study_Author_Year)%>%
+  arrange(desc(n))%>%
+  filter(n>1)%>%
+  print(n=25)
+
+
+df%>%
+  filter(Review_Risk_Factors =="Diabetes")%>%
+  filter(Study_Author_Year=="Sanchez-Gomez,2021"|
+         Study_Author_Year=="Driver,208"|
+           Study_Author_Year=="Hu,2007"|
+           Study_Author_Year=="Palacios,2011"|
+           Study_Author_Year=="Xu,2011")%>%
+  mutate(NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(!is.na(NOS_Total_Study_Quality_Score))%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, NOS_Total_Study_Quality_Score)%>%
+  distinct()%>%
+  arrange(desc(Study_Author_Year))%>%
+  print(n=25)
+
+
+
+
+
+
+
+#### MISSING DATA ----
+DataExplorer::plot_missing(df)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(title="Percentage of Missing per column")
+#### GRAPHICAL EXPLORATION OF DATA ----
+DataExplorer::introduce(df)
+df%>%
+  select(Review_Author_Year, Review_Year)%>%
+  distinct()%>%
+  select(Review_Year)%>%
+  group_by(Review_Year)%>%
+  count()%>%
+  arrange(desc(n))%>%
+  ggplot(.)+
+  geom_bar(aes(x=Review_Year, 
+               y=n), 
+           stat="identity")+
+  theme_bw()+
+  labs(x="Year review was published", 
+       y="Frequency of reviews per year", 
+       title="Number of reviews per year")
+
+df%>%
+  group_by(Study_Year)%>%
+  select(Study_Year)%>%
+  count()%>%
+  arrange(desc(n))%>%
+  ggplot(.)+
+  geom_bar(aes(x=Study_Year, 
+               y=n), 
+           stat="identity")+
+  theme_bw()+
+  labs(x="Year study was published", 
+       y="Frequency of studies per year", 
+       title="Number of studies per year")
+
+length(unique(df$Review_Risk_Factors))
+df%>%
+  group_by(Review_Risk_Factors)%>%
+  select(Review_Author_Year)%>%
+  distinct()%>%
+  count()%>%
+  select(Review_Risk_Factors, n)%>%
+  ungroup()%>%
+  arrange(desc(n))%>%
+  ggplot(.)+
+  geom_bar(aes(y=Review_Risk_Factors, 
+               x=n), 
+           stat="identity")+
+  theme_bw()+
+  scale_x_continuous(name ="Number of reviews", 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,15,20,25,30))%>%
+  labs(x="Number of reviews", 
+       y="Risk factor of interest", 
+       title="Number of reviews that looked at a particular risk factor", 
+       caption = "Because reviews can look at multiple risk factors, the total number of reviews exceeds N=120")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides" | 
+           Review_Risk_Factors =="Diabetes"| 
+           Review_Risk_Factors =="Smoking"| 
+           Review_Risk_Factors =="Cholesterol"| 
+           Review_Risk_Factors =="Alcohol"| 
+           Review_Risk_Factors =="Iron"| 
+           Review_Risk_Factors =="Statins"| 
+           Review_Risk_Factors =="BMI"| 
+           Review_Risk_Factors =="Fat" |
+           Review_Risk_Factors =="Gout") %>%
+  select(Review_Risk_Factors, Review_Author_Year, Review_Year)%>%
+  distinct()%>%
+  ggplot()+
+  geom_bar(aes(x=Review_Year, 
+               fill=Review_Risk_Factors), position="dodge")+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  labs(x="Year review was published", 
+       y="Number of reviews for a risk factor", 
+       title="Number of reviews for a risk factor for Parkinson per year", 
+       fill="Review risk factor")+
+  facet_wrap(~Review_Risk_Factors, ncol=3)
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides" | 
+           Review_Risk_Factors =="Diabetes"| 
+           Review_Risk_Factors =="Smoking"| 
+           Review_Risk_Factors =="Cholesterol"| 
+           Review_Risk_Factors =="Alcohol"| 
+           Review_Risk_Factors =="Iron"| 
+           Review_Risk_Factors =="Statins"| 
+           Review_Risk_Factors =="BMI"| 
+           Review_Risk_Factors =="Fat" |
+           Review_Risk_Factors =="Gout") %>%
+  select(Review_Risk_Factors,Study_Author_Year, Study_Year)%>%
+  distinct()%>%
+  ggplot()+
+  geom_bar(aes(x=Study_Year, 
+               fill=Review_Risk_Factors), position="dodge")+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  labs(x="Year review was published", 
+       y="Number of studies for a risk factor", 
+       title="Number of studies for a risk factor for Parkinson per year", 
+       fill="Review risk factor")+
+  facet_wrap(~Review_Risk_Factors, ncol=3, scales="free")
+
+
+df%>%
+  select(NOS_Total_Study_Quality_Score)%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  ggplot()+
+  geom_bar(aes(x=NOS_Total_Study_Quality_Score))+
+  theme_bw()+
+  labs(x="NOS Total Quality Score", 
+       y="Frequency", 
+       title="Frequency distribution of NOS Total Quality Score")
+
+df%>%
+  select(NOS_Total_Study_Quality_Score)%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  ggplot()+
+  geom_bar(aes(x=NOS_Total_Study_Quality_Score))+
+  theme_bw()+
+  labs(x="NOS Total Quality Score", 
+       y="Frequency", 
+       title="Frequency distribution of NOS Total Quality Score")
+
+
+df%>%
+  mutate(colB = tolower(Study_Adjustments))%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  select(colB, Review_Author_Year, Study_Author_Year)%>%
+  add_rownames(var = "id")%>%
+  drop_na()%>%
+  unnest_tokens(Confounder, colB, token = stringr::str_split, pattern = ",")%>%
+  mutate(Confounder = stringr::str_squish(Confounder))%>%
+  drop_na()%>%
+  distinct()%>%
+  group_by(Confounder, Review_Author_Year, Study_Author_Year) %>%
+  arrange(desc(Confounder)) %>%
+  #filter(row_number()==1)%>%
+  ungroup()%>%
+  count(Confounder)%>%
+  mutate(perc = n / 415)%>%
+  arrange(desc(perc))%>%
+  slice_max(n, n = 10)%>%
+  ggplot()+
+  geom_bar(aes(y=Confounder, x=perc), stat="identity")+
+  theme_bw()+
+  labs(y="Confounder", 
+       x="Number of times used (%)", 
+       title="Top 10 confounders used in research between Pesticides and Parkinson")
+
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric   =="OR" | 
+           Review_Risk_Metric =="RR")%>%
+  ggplot(., 
+         aes(x=Study_Year, 
+             y=Review_Risk_Estimate, 
+             col=Review_Risk_Metric))+
+  geom_point()+
+  theme_bw() +
+  theme(legend.position="bottom")+
+  labs(x="Study Year", 
+       y="Risk Estimate", 
+       col="Risk Metric", 
+       title="Risk estimates for all reviews reporting odds- or risk-ratio's")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric   =="OR" | 
+           Review_Risk_Metric =="RR")%>%
+  ggplot(., 
+         aes(x=Study_Year, 
+             y=Review_Risk_Estimate, 
+             col=Review_Risk_Metric))+
+  geom_point()+
+  theme_bw() +
+  theme(legend.position="bottom")+
+  facet_grid(~Study_Design, scales="free")+
+  labs(x="Study Year", 
+       y="Risk Estimate", 
+       col="Risk Metric", 
+       title="Risk estimates for all reviews reporting odds- or risk-ratio's", 
+       subtitle="Per study design", 
+       caption="Please take note that the points overlap, which means that the points show the spread in estimates, but not many estimates there are")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric   =="OR" | 
+           Review_Risk_Metric =="RR")%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             fill=Review_Risk_Metric))+
+  geom_density(alpha=0.5)+
+  geom_vline(xintercept = 1, lty=2, col="black")+
+  theme_bw() +
+  theme(legend.position="bottom")+
+  xlim(0,5)+
+  labs(x="Density", 
+       y="Risk Estimate", 
+       fill="Risk Metric", 
+       title="Risk estimates for all reviews reporting odds- or risk-ratio's", 
+       caption="Limits for the x-asis are set at 0,5 to increase visibility of the density function")
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Dose)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Review_Author_Year, 
+             col=Dose))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Significant)+
+  labs(title="Risk estimates per reported Liou,1997 study", 
+       x="Risk Estimate", 
+       y="Review Author & Year", 
+       col="Dose", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row")
+
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year == "Liou,1997")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Dose, Study_Risk_Factor)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Review_Author_Year, 
+             col=Study_Risk_Factor))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Significant)+
+  labs(title="Risk estimates per reported Liou,1997 study", 
+       subtitle="Per risk factor as determined per study",
+       x="Risk Estimate", 
+       y="Review Author & Year", 
+       col="Study risk factor", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row")
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year == "Hertzman,1994")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Sex)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Review_Author_Year, 
+             col=Sex))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Significant)+
+  labs(title="Risk estimates per reported Hertzman,1994 study", 
+       x="Risk Estimate", 
+       y="Review Author & Year", 
+       col="Sex", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year == "Hertzman,1994")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Dose, Study_Risk_Factor)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Review_Author_Year, 
+             col=Study_Risk_Factor))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Significant)+
+  labs(title="Risk estimates per reported Hertzman,1994 study", 
+       subtitle="Per risk factor as determined per study",
+       x="Risk Estimate", 
+       y="Review Author & Year", 
+       col="Risk factor", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year == "Hertzman,1994" | Study_Author_Year =="Liou,1997")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Review_Total_N, Study_Risk_Factor, 
+         Review_Risk_Estimate_Difference)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate_Difference,
+             y=Review_Risk_Estimate, 
+             col=Significant, 
+             size=Review_Total_N))+
+  geom_point()+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for Hertzman,1994 and Liou,1997", 
+       y="Risk estimate", 
+       x="Length of 95% Confidence Interval", 
+       col="Significant finding",
+       size="Total sample size", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row")
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Review_Total_N, Study_Risk_Factor, 
+         Review_Risk_Estimate_Difference)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=log10(Review_Risk_Estimate_Difference),
+             y=Review_Risk_Estimate, 
+             col=Significant, 
+             size=log10(Review_Total_N)))+
+  geom_point(alpha=0.5)+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  xlim(-1,3)+
+  ylim(-1,10)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for all pesticide studies",
+       subtitle="Who reported odds-ratios en risk-ratios",
+       y="Risk estimate", 
+       x="Length of 95% Confidence Interval", 
+       col="Significant finding",
+       size="Total sample size", 
+       caption="These findings are extracted from each review and therefore can 
+       differ which is reflected by multiple values on a row. X-axis en y-axis capped at (-1,3) and (-1,10), respectively")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Review_Total_N, Study_Risk_Factor, 
+         Review_Risk_Estimate_Difference)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=log10(Review_Risk_Estimate_Difference),
+             y=Review_Risk_Estimate, 
+             col=Review_Author_Year, 
+             size=log10(Review_Total_N)))+
+  geom_point(alpha=0.5)+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  xlim(-1,3)+
+  ylim(-1,10)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for all pesticide studies",
+       subtitle="Who reported odds-ratios en risk-ratios",
+       y="Risk estimate", 
+       x="Length of 95% Confidence Interval", 
+       col="Review_Author",
+       size="Total sample size (log10 scale)", 
+       caption="These findings are extracted from each review and therefore can 
+       differ which is reflected by multiple values on a row. X-axis en y-axis capped at (-1,3) and (-1,10), respectively")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Review_Total_N, Study_Risk_Factor, 
+         Review_Risk_Estimate_Difference)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=log10(Review_Risk_Estimate_Difference),
+             y=Review_Risk_Estimate, 
+             col=Study_Author_Year, 
+             size=log10(Review_Total_N)))+
+  geom_point(alpha=0.5, show.legend = FALSE)+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  xlim(-1,3)+
+  ylim(-1,10)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for all pesticide studies",
+       subtitle="Who reported odds-ratios en risk-ratios",
+       y="Risk estimate", 
+       x="Length of 95% Confidence Interval", 
+       col="Study Author Year",
+       size="Total sample size (log10 scale)", 
+       caption="These findings are extracted from each review and therefore can 
+       differ which is reflected by multiple values on a row. X-axis en y-axis capped at (-1,3) and (-1,10), respectively")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Dose, Study_Risk_Factor)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=Significant))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  xlim(-1, 10)+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for each pesticide study", 
+       subtitle="Per risk factor as determined per study",
+       x="Risk Estimate & 95% Confidence Interval", 
+       y="Study Author & Year", 
+       col="Significant", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row. 
+       I set the x-limiter at (-1, 10) which leads to some confidence bands not being drawn because they exceed the limiter. ")
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Dose, Study_Risk_Factor)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=Significant))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  facet_wrap(~Review_Author_Year, ncol=3, scales="free")+
+  xlim(-1, 10)+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for each pesticide study", 
+       subtitle="Per risk factor as determined per study",
+       x="Risk Estimate & 95% Confidence Interval", 
+       y="Study Author & Year", 
+       col="Significant", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row. 
+       I set the x-limiter at (-1, 10) which leads to some confidence bands not being drawn because they exceed the limiter. ")
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Author_Year =="Ahmed,2017" | 
+           Review_Author_Year =="Allen,2013"|
+           Review_Author_Year =="Breckenridge,2016"|
+           Review_Author_Year =="van der Mark,2012")%>%
+  select(Study_Author_Year, Review_Author_Year, Review_Risk_Metric, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Dose, Study_Risk_Factor)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=Significant))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  facet_wrap(~Review_Author_Year, ncol=2, scales="free")+
+  xlim(-1, 10)+
+  theme(legend.position = "bottom")+
+  labs(title="Risk estimates for each pesticide study", 
+       subtitle="Per risk factor as determined per study",
+       x="Risk Estimate & 95% Confidence Interval", 
+       y="Study Author & Year", 
+       col="Significant", 
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row. 
+       I set the x-limiter at (-1, 10) which leads to some confidence bands not being drawn because they exceed the limiter. ")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Review_Risk_Factors=="Diabetes")%>%
+  #mutate(NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=NOS_Total_Study_Quality_Score))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Risk Estimate", 
+       y="Study author and year", 
+       col="NOS total quality score", 
+       title="NOS total quality score per risk estimate per study for diabetes",
+       caption="These findings are extracted from each review and therefore can differ which is reflected by multiple values on a row.")
+
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  ggplot()+
+  geom_point(aes(x=Study_Year, 
+                 y=Review_Risk_Estimate, 
+                 size=NOS_Total_Study_Quality_Score), alpha=0.5)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  ylim(-5,15)+
+  labs(x="Study year", 
+       y="Risk estimate",
+       size="NOS total quality score",
+       title="Relationship between study year and NOS total quality score", 
+       caption="Only looked at ratio's (OR, RR, IRR, HR). Set the y-limiter at (-5,15)")
+
+  
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  drop_na(Review_Risk_Estimate_Difference, Review_Total_N, NOS_Total_Study_Quality_Score)%>%
+  ggplot()+
+  geom_point(aes(x=NOS_Total_Study_Quality_Score, 
+                 y=Review_Risk_Estimate, 
+                 col=log10_Estimate_Diff, 
+                 size=log10_Review_Total_N), 
+             alpha=0.5)+
+  theme_bw()+
+  facet_grid(~Study_Design)+
+  theme(legend.position = "bottom")+
+  ylim(-2, 10)+
+  scale_color_viridis_c(option="turbo")+
+  labs(x="NOS total quality score", 
+       y="Risk estimate", 
+       col="95% confidence interval distance (log scale)", 
+       size="Total sample size (log scale)", 
+       title="Relationship between NOS total quality score, risk estimate, uncertainty and total sample size", 
+       subtitle="by study design", 
+       caption="Only looked at ratio's (OR, RR, IRR, HR). Set the y-limiter at (-2,10)")
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  drop_na(Review_Risk_Estimate_Difference, Review_Total_N, NOS_Total_Study_Quality_Score)%>%
+  ggplot()+
+  geom_point(aes(x=log10_Estimate_Diff, 
+                 y=Review_Risk_Estimate, 
+                 col=NOS_Total_Study_Quality_Score, 
+                 size=log10_Review_Total_N), 
+             alpha=0.5)+
+  theme_bw()+
+  facet_grid(~Study_Design)+
+  theme(legend.position = "bottom")+
+  ylim(-2, 10)+
+  scale_color_viridis_c(option="turbo")+
+  labs(col="NOS total quality score", 
+       y="Risk estimate", 
+       x="95% confidence interval distance (log scale)", 
+       size="Total sample size (log scale)", 
+       title="Relationship between NOS total quality score, risk estimate, uncertainty and total sample size", 
+       subtitle="by study design", 
+       caption="Only looked at ratio's (OR, RR, IRR, HR). Set the y-limiter at (-2,10)")
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(NOS_Total_Study_Quality_Score=as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  filter(between(Review_Risk_Estimate, -1, 10))%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  drop_na(Review_Risk_Estimate_Difference, Review_Total_N, NOS_Total_Study_Quality_Score)%>%
+  ggplot()+
+  geom_point(aes(x=log10_Estimate_Diff, 
+                 y=log10_Review_Total_N, 
+                 size=NOS_Total_Study_Quality_Score, 
+                 col=Review_Risk_Estimate), 
+             alpha=0.5)+
+  theme_bw()+
+  facet_grid(~Study_Design)+
+  theme(legend.position = "bottom")+
+  ylim(-2, 10)+
+  scale_color_viridis_c(option="turbo")+
+  labs(size="NOS total quality score", 
+       col="Risk estimate", 
+       x="95% confidence interval distance (log scale)", 
+       y="Total sample size (log scale)", 
+       title="Relationship between NOS total quality score, risk estimate, uncertainty and total sample size", 
+       subtitle="by study design", 
+       caption="Only looked at ratio's (OR, RR, IRR, HR). Set the y-limiter at (-2,10)")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=log10_Review_Total_N, 
+                 col=Study_Design, 
+                 size=Review_Risk_Estimate_Difference))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Total sample size per study (log scale)", 
+       y="Risk estimate", 
+       col="Study Design",
+       size="95% confidence interval distance",
+       title="Relationship between total sample size, risk estimate and study design for pesticides",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=log10_Review_Total_N, 
+                 col=Significant, 
+                 size=Review_Risk_Estimate_Difference))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Study_Design)+
+  labs(x="Total sample size per study (log scale)", 
+       subtitle="per study design",
+       y="Risk estimate", 
+       col="Significant",
+       size="95% confidence interval distance",
+       title="Relationship between total sample size, risk estimate and study design for pesticides",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N), 
+         Study_Year = as.numeric(Study_Year))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=Study_Year, 
+                 size=Review_Total_N, 
+                 col=Significant))+
+  theme_bw()+
+  facet_grid(~Study_Design)+
+  theme(legend.position = "bottom")+
+  labs(size="Total sample size per study ", 
+       y="Risk estimate", 
+       col="Significant",
+       x="Study year",
+       title="Relationship between total sample size, risk estimate and study design for pesticides",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=log10_Review_Total_N, 
+                 col=Study_Design, 
+                 size=Review_Risk_Estimate_Difference))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Total sample size per study (log scale)", 
+       y="Risk estimate", 
+       col="Study Design",
+       size="95% confidence interval distance",
+       title="Relationship between total sample size, risk estimate and study design",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=log10_Review_Total_N, 
+                 col=Significant, 
+                 size=Review_Risk_Estimate_Difference))+
+  theme_bw()+
+  facet_grid(~Study_Design)+
+  theme(legend.position = "bottom")+
+  labs(x="Total sample size per study (log scale)",
+       subtitle="per study design",
+       y="Risk estimate", 
+       col="Significant",
+       size="95% confidence interval distance",
+       title="Relationship between total sample size, risk estimate and study design",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=log10_Review_Total_N, 
+                 col=Significant, 
+                 size=Review_Risk_Estimate_Difference))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(Study_Design~Study_Adjustments_Binary)+
+  labs(x="Total sample size per study (log scale)", 
+       subtitle="per study adjustments (Yes vs No) and study design",
+       y="Risk estimate", 
+       col="Significant",
+       size="95% confidence interval distance",
+       title="Relationship between total sample size and risk estimate for pesticides",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+df%>%
+  #filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Study_Design=="Cohort" | Study_Design =="Case control")%>%
+  ggplot()+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=log10_Review_Total_N, 
+                 col=Significant, 
+                 size=Review_Risk_Estimate_Difference))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(Study_Design~Study_Adjustments_Binary)+
+  labs(x="Total sample size per study (log scale)", 
+       subtitle="per study adjustments (Yes vs No) and study design",
+       y="Risk estimate", 
+       col="Significant",
+       size="95% confidence interval distance",
+       title="Relationship between total sample size and risk estimate",
+       caption="Only looked at ratio's (OR, RR, IRR, HR)")
+
+
+df%>%
+  filter(Review_Risk_Metric =="WMD" |
+           Review_Risk_Metric =="SMD")%>%
+  ggplot(., 
+         aes(x=Study_Year, 
+             y=Review_Risk_Estimate, 
+             col=Study_Design))+
+  geom_point()+
+  theme(legend.position="bottom")+
+  geom_hline(yintercept=0, col="black", lty=2)+
+  theme_bw() + 
+  theme(legend.position="bottom")+
+  facet_wrap(~Review_Risk_Metric, ncol=1, scales="free")+
+  labs(x="Study year", 
+       y="Risk estimate", 
+       col="Study design", 
+       title="Relationship between study year, risk estimate and study design", 
+       subtitle="by risk metric")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric =="WMD")%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=Significant))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(y="Study author & year", 
+       x="Risk estimate", 
+       col="Significant", 
+       title="Findings for all studies that reported weighted mean differences")
+
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(  Review_Risk_Metric =="SMD" | 
+             #Review_Risk_Metric =="WMD" |
+             Review_Risk_Metric =="SMR" | 
+             Review_Risk_Metric =="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=Significant))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  xlim(-5,5)+
+  labs(y="Study author & year", 
+       x="Risk estimate", 
+       col="Significant", 
+       title="Findings for all studies that reported standardized differences",
+       caption="Standardized differences here include mean differences, risk ratio's and incidence ratio's")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric =="WMD")%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=log10_Estimate_Diff,
+             size=log10_Review_Total_N,
+             col=Significant))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point()+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(y="95% confidence interval distance", 
+       x="Risk estimate", 
+       col="Significant", 
+       size="Total sample size per study (log scale)",
+       title="Relationship between risk estimate, uncertainty and study size across studies",
+       subtitle= "for a weighted mean difference")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric =="SMD"| 
+         Review_Risk_Metric =="SMR"| 
+         Review_Risk_Metric =="SIR")%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=log10_Estimate_Diff,
+             size=log10_Review_Total_N,
+             col=Significant))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point(alpha=0.5)+
+  theme_bw()+
+  xlim(-4, 4)+
+  theme(legend.position = "bottom")+
+  labs(y="95% confidence interval distance", 
+       x="Risk estimate", 
+       col="Significant", 
+       size="Total sample size per study (log scale)",
+       title="Relationship between risk estimate, uncertainty and study size across studies",
+       subtitle= "for a standardized mean difference", 
+       caption="Standardized differences here include mean differences, risk ratio's and incidence ratio's. X-axis limiter set at (-4,4)")
+
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric =="SMD"| 
+         Review_Risk_Metric =="SMR"| 
+         Review_Risk_Metric =="SIR"|
+         Review_Risk_Metric =="WMD" )%>%
+  mutate(Standardized = case_when(
+      Review_Risk_Metric =="SMD" ~ 'Standardized',
+      Review_Risk_Metric =="SMR"~ 'Standardized',
+      Review_Risk_Metric =="SIR"~ 'Standardized',
+      Review_Risk_Metric =="WMD" ~ 'Raw'))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N))%>%
+  filter(!is.na(Review_Risk_Estimate))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=log10_Estimate_Diff,
+             size=log10_Review_Total_N,
+             col=Significant))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point()+
+  theme_bw()+
+  facet_grid(Study_Design~Standardized, scales="free")+
+  theme(legend.position = "bottom")+
+  labs(y="95% confidence interval distance", 
+       x="Risk estimate", 
+       col="Significant", 
+       size="Total sample size per study (log scale)",
+       title="Relationship between risk estimate, uncertainty and study size across studies",
+       subtitle= "for weighted and standardized differences", 
+       caption="Standardized differences here include mean differences, risk ratio's and incidence ratio's")
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric =="SMD"| 
+           Review_Risk_Metric =="SMR"| 
+           Review_Risk_Metric =="SIR"|
+           Review_Risk_Metric =="WMD" )%>%
+  filter(Study_Design=="Case control")%>%
+  mutate(Standardized = case_when(
+    Review_Risk_Metric =="SMD" ~ 'Standardized',
+    Review_Risk_Metric =="SMR"~ 'Standardized',
+    Review_Risk_Metric =="SIR"~ 'Standardized',
+    Review_Risk_Metric =="WMD" ~ 'Raw'))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N), 
+         NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(!is.na(Review_Risk_Estimate))%>%
+  filter(Standardized=="Standardized")%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=log10_Estimate_Diff,
+             size=log10_Review_Total_N,
+             col=NOS_Total_Study_Quality_Score))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point()+
+  theme_bw()+
+  facet_grid(Significant~Standardized, scales="free")+
+  theme(legend.position = "bottom")+
+  scale_color_viridis_c(option="turbo")+
+  xlim(-4,4)+
+  labs(y="95% confidence interval distance", 
+       x="Risk estimate", 
+       col="NOS Total quality score", 
+       size="Total sample size per study (log scale)",
+       title="Relationship between risk estimate, study quality, uncertainty and study size across studies",
+       subtitle= "for standardized differences", 
+       caption="Standardized differences here include mean differences, risk ratio's and incidence ratio's")
+
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Metric =="SMD"| 
+           Review_Risk_Metric =="SMR"| 
+           Review_Risk_Metric =="SIR"|
+           Review_Risk_Metric =="WMD" )%>%
+  filter(Study_Design=="Case control")%>%
+  mutate(Standardized = case_when(
+    Review_Risk_Metric =="SMD" ~ 'Standardized',
+    Review_Risk_Metric =="SMR"~ 'Standardized',
+    Review_Risk_Metric =="SIR"~ 'Standardized',
+    Review_Risk_Metric =="WMD" ~ 'Raw'))%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(log10_Estimate_Diff =log10(Review_Risk_Estimate_Difference), 
+         log10_Review_Total_N =log10(Review_Total_N), 
+         NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  filter(!is.na(Review_Risk_Estimate))%>%
+  filter(Standardized=="Standardized")%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=log10_Estimate_Diff,
+             size=log10_Review_Total_N,
+             col=Study_Adjustments_Binary))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point(alpha=0.5)+
+  theme_bw()+
+  facet_grid(Significant~Standardized, scales="free")+
+  theme(legend.position = "bottom")+
+  xlim(-4,4)+
+  labs(y        = "95% confidence interval distance", 
+       x        = "Risk estimate", 
+       col      = "Study adjustments (binary)", 
+       size     = "Total sample size per study (log scale)",
+       title    = "Relationship between risk estimate, estimate adjustments, uncertainty and study size across studies",
+       subtitle = "for standardized differences", 
+       caption  = "Standardized differences here include mean differences, risk ratio's and incidence ratio's")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Review_Total_N)%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 & Review_Risk_Estimate_High > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  filter(Review_Risk_Factors=="Smoking")%>%
+  filter(Review_Author_Year=="Hernan,2002" | Review_Author_Year=="Noyce,2012")%>%
+  ggplot(aes(#size=log10(Review_Total_N), 
+    x=Review_Risk_Estimate, 
+    y=Study_Author_Year, 
+    col=Significant, 
+    xmin=Review_Risk_Estimate_Low, 
+    xmax=Review_Risk_Estimate_High))+
+  geom_vline(xintercept=1, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Review_Author_Year, scales="free")+
+  xlim(-5, 5)
+
+df%>%
+  drop_na(Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  filter(  Review_Risk_Metric =="SMD" | 
+             #Review_Risk_Metric =="WMD" |
+             Review_Risk_Metric =="SMR" | 
+             Review_Risk_Metric =="SIR" )%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 0 & Review_Risk_Estimate_Low  > 0 & Review_Risk_Estimate_High > 0 ~ 'Yes', 
+    Review_Risk_Estimate < 0 & Review_Risk_Estimate_High < 0 & Review_Risk_Estimate_High < 0 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(x=Review_Risk_Estimate, 
+             y=Study_Author_Year, 
+             col=Significant))+
+  geom_vline(xintercept=0, col="black", lty=2)+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  xlim(-5,5)
+
+
+
+
+
+
+
+
+
+df%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(Study_Design=="Case control"| Study_Design=="Cohort")%>%
+  mutate(Significant = case_when(
+    Review_Risk_Estimate > 1 & Review_Risk_Estimate_Low  > 1 ~ 'Yes', 
+    Review_Risk_Estimate < 1 & Review_Risk_Estimate_High < 1 ~ 'Yes', 
+    TRUE ~ 'No'), 
+    Study_Year = as.numeric(Study_Year))%>%
+  filter(Significant=="No"|Significant=="Yes")%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  ggplot()+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  geom_point(aes(y=Review_Risk_Estimate, 
+                 x=Study_Year, 
+                 col=Study_Risk_Factor, 
+                 size=log10(Review_Total_N)))+
+  
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Significant)
+
+
+df%>%
+  mutate(Review_Total_N = as.numeric(Study_Risk_Patients) + as.numeric(Study_Risk_Controls))%>%
+  select(Review_Risk_Factors, Review_Author_Year, Study_Author_Year, Study_Risk_Factor, Review_Total_N, Study_Risk_Patients, Study_Risk_Controls, 
+         Review_Risk_Events, Review_Risk_Total, Review_Control_Events, Review_Control_Total)%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  select(Review_Risk_Factors, Review_Author_Year, Study_Author_Year, Study_Risk_Factor, Review_Total_N)%>%
+  distinct()%>%
+  ggplot()+
+  geom_boxplot(aes(y=Study_Risk_Factor, x=Review_Total_N))
+
+df%>%
+  mutate(Review_Total_N = as.numeric(Study_Risk_Patients) + as.numeric(Study_Risk_Controls))%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  distinct()%>%
+  ggplot()+
+  geom_boxplot(aes(y=Study_Design, x=log10(Review_Total_N)))
+
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  ggplot(., 
+         aes(x=Study_Year, 
+             y=Review_Risk_Estimate, 
+             col=Study_Design))+
+  geom_point()+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  theme_bw() + 
+  theme(legend.position="bottom")+
+  facet_wrap(~Review_Risk_Metric, ncol=1)
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             y=Study_Author, 
+             col=Study_Risk_Factor))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="red", lty=2)+
+  theme(legend.position = "bottom")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             y=Study_Author, 
+             col=Review_Risk_Metric))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="red", lty=2)+
+  theme(legend.position = "bottom")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             y=Study_Author, 
+             col=Review_Primary_Model))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="red", lty=2)+
+  theme(legend.position = "bottom")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = if_else(Review_Risk_Estimate_Low>1, "Yes", "No"))%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             y=Study_Author, 
+             col=Significant, 
+             size=))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="red", lty=2)+
+  theme(legend.position = "bottom")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  mutate(Significant = if_else(Review_Risk_Estimate_Low>=1, "Yes", "No"), 
+         Study_Year = as.numeric(Study_Year))%>%
+  ggplot(., 
+         aes(y=Review_Risk_Estimate, 
+             x=Study_Year, 
+             col=Significant))+
+  geom_point(position=position_dodge(0.1))+
+  geom_pointrange(aes(ymin=Review_Risk_Estimate_Low, 
+                      ymax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.1))+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  ylim(-1, 10)+
+  facet_grid(~Study_Design)
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             y=Study_Author, 
+             col=Study_Risk_Factor))+
+  geom_point(position=position_dodge(0.1))+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.1))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="red", lty=2)+
+  theme(legend.position = "bottom")
+
+
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estimate, 
+             y=Study_Author, 
+             col=Study_Risk_Factor))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="red", lty=2)+
+  theme(legend.position = "bottom")+
+  facet_grid(~Study_Design)
+
+
+df%>%
+  mutate(Review_Risk_Estime_Difference = Review_Risk_Estimate_High - Review_Risk_Estimate_Low)%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estime_Difference, 
+             y=Review_Risk_Estimate, 
+             col=Study_Design))+
+  geom_point()+
+  theme(legend.position="bottom")+
+  theme_bw() + 
+  theme(legend.position="bottom")+
+  scale_x_continuous(trans="log10")+
+  facet_wrap(~Review_Risk_Metric, ncol=2, scales="free")
+
+
+df%>%
+  filter(Review_Risk_Metric =="OR" |  
+           Review_Risk_Metric =="Diagnostic OR")%>%
+  ggplot(., 
+         aes(x=Study_Year, 
+             y=Review_Risk_Estimate, 
+             col=Study_Design))+
+  geom_point()+
+  theme(legend.position="bottom")+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  theme_bw() + 
+  theme(legend.position="bottom")+
+  facet_wrap(~Review_Risk_Metric, ncol=1, scales="free")
+
+df%>%
+  filter(Review_Risk_Metric =="OR" | 
+           Review_Risk_Metric =="Crude OR" | 
+           Review_Risk_Metric =="Diagnostic OR")%>%
+  mutate(Review_Risk_Estime_Difference = Review_Risk_Estimate_High - Review_Risk_Estimate_Low)%>%
+  ggplot(., 
+         aes(x=Review_Risk_Estime_Difference, 
+             y=Review_Risk_Estimate, 
+             col=Study_Design))+
+  geom_point()+
+  theme(legend.position="bottom")+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  theme_bw() + 
+  theme(legend.position="bottom")+
+  scale_x_continuous(trans="log10")
+facet_wrap(~Review_Risk_Metric, ncol=1, scales="free")
+
+
+
+
+df%>%
+  filter(`Review Risk Metric` =="OR")%>%
+  ggplot(., 
+         aes(x=`Study Year`, 
+             y=`Review Risk Estimate`, 
+             col=`Review Risk Factors`))+
+  geom_point()+
+  theme(legend.position="bottom")+
+  geom_hline(yintercept=1, col="black", lty=2)+
+  theme_bw() + theme(legend.position="bottom")
+
+
+
+
+df%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Study_Author_Year, Review_Risk_Estimate)%>%
+  ggplot(aes(y=Study_Author_Year, 
+             x=Review_Risk_Estimate, 
+             col=Review_Author_Year))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="darkgrey", lty=2)+
+  theme(legend.position = "bottom")+
+  xlim(-1, 20)
+
+df%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Study_Author_Year, Review_Risk_Estimate)%>%
+  ggplot(aes(y=Study_Author_Year, 
+             x=Review_Risk_Estimate, 
+             col=Review_Author_Year))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="darkgrey", lty=2)+
+  theme(legend.position = "bottom")+
+  facet_wrap(~Review_Author_Year, ncol=3, scales = "free")+
+  xlim(-1, 20)
+
+
+df%>%
+  filter(Review_Risk_Factors=="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR")%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Study_Author_Year, Review_Risk_Estimate)%>%
+  mutate(Significant = if_else(Review_Risk_Estimate_Low>=1, "Yes", "No"))%>%
+  ggplot(aes(y=Study_Author_Year, 
+             x=Review_Risk_Estimate, 
+             col=Significant))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="darkgrey", lty=2)+
+  theme(legend.position = "bottom")+
+  facet_wrap(~Review_Author_Year, ncol=3, scales = "free")
+
+df%>%
+  filter(Review_Risk_Factors=="Alcohol")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Study_Author_Year, Review_Risk_Estimate)%>%
+  ggplot(aes(y=Study_Author_Year, 
+             x=Review_Risk_Estimate, 
+             col=Review_Author_Year))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="darkgrey", lty=2)+
+  theme(legend.position = "bottom")
+
+df%>%
+  filter(Review_Risk_Factors=="Alcohol")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  select(Study_Author_Year, Review_Author_Year, Study_Risk_Factor, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, Review_Risk_Estimate_High)%>%
+  arrange(Study_Author_Year, Review_Risk_Estimate)%>%
+  mutate(Significant = if_else(Review_Risk_Estimate_Low>=1, "Yes", "No"))%>%
+  ggplot(aes(y=Study_Author_Year, 
+             x=Review_Risk_Estimate, 
+             col=Significant))+
+  geom_point()+
+  geom_pointrange(aes(xmin=Review_Risk_Estimate_Low, 
+                      xmax=Review_Risk_Estimate_High),
+                  position=position_dodge(0.05))+
+  theme_bw()+
+  geom_vline(xintercept=1, col="darkgrey", lty=2)+
+  theme(legend.position = "bottom")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### META-ANALYSIS ----
+test<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Author_Year =="Ahmed,2017")%>%
+  select(Study_Author_Year, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High, Study_Year, Review_Total_N)%>%
+  mutate(vi = ((Review_Risk_Estimate_High-Review_Risk_Estimate_Low)/3.92)^2,
+         yi = Review_Risk_Estimate, 
+         Study_Year = as.numeric(Study_Year))%>%
+  select(Study_Author_Year, yi, vi, Study_Year, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low,Review_Risk_Estimate_High,
+         Review_Total_N)%>%
+  arrange(Study_Author_Year)
+dat<-metafor::conv.wald(out=Review_Risk_Estimate, 
+                   ci.lb=Review_Risk_Estimate_Low, 
+                   ci.ub=Review_Risk_Estimate_High, 
+                   data=test,
+                   n=Review_Total_N,
+                   transf = "log", 
+                   check=TRUE)
+test%>%filter(Study_Author_Year=="Baldi,2003")%>%
+  select(Study_Author_Year, yi,vi)
+dat%>%filter(Study_Author_Year=="Baldi,2003")%>%
+  select(Study_Author_Year, yi,vi)
+
+res<-rma(yi=yi, vi=vi, data=test)
+summary(res)
+res<-rma(yi=yi, vi=vi, data=test, method="REML")
+summary(res)
+res<-rma(yi=yi, vi=vi, data=test, method="DL")
+summary(res)
+res<-rma(yi=yi, vi=vi, data=test, method="EB")
+summary(res)
+res<-rma(yi=yi, vi=vi, data=test, method="HSk")
+summary(res)
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Author_Year =="Ahmed,2017")%>%
+  select(Study_Author_Year, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  mutate(left = abs(Review_Risk_Estimate-Review_Risk_Estimate_Low), 
+         right= abs(Review_Risk_Estimate-Review_Risk_Estimate_High), 
+         dist = abs(right-left),
+         equal_dist = if_else(left == right, 'yes', 'no'))%>%
+  select(equal_dist)%>%
+  group_by(equal_dist)%>%
+  count()
+
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Author_Year =="Ahmed,2017")%>%
+  select(Study_Author_Year, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High, Review_Risk_Estimate_Difference)%>%
+  mutate(left = abs(Review_Risk_Estimate-Review_Risk_Estimate_Low), 
+         right= abs(Review_Risk_Estimate-Review_Risk_Estimate_High), 
+         dist = abs(right-left),
+         equal_dist = if_else(left == right, 'yes', 'no'))%>%
+  ggplot()+
+  geom_point(aes(x=left, 
+                 y=right, 
+                 size=Review_Risk_Estimate), alpha=0.5)+
+  geom_abline(intercept=0, slope=1, lty=2, col="red")+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Left distance 95% confidence interval",
+       y="Right distance 95% confidence interval", 
+       size="Risk estimate", 
+       title="Relationship between left and right distance of the 95% confidence interval and the risk estimate", 
+       subtitle = "for the review of Ahmed,2017 focused on pesticides")
+
+
+meta_df_sub<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Author_Year =="Ahmed,2017"|
+         Review_Author_Year =="van der Mark,2012"|
+         Review_Author_Year =="Allen,2013"|
+         Review_Author_Year =="Breckenridge,2016")%>%
+  select(Review_Author_Year, Study_Author_Year, Review_Risk_Estimate, Review_Risk_Estimate_Low, Review_Risk_Estimate_High, Study_Year)%>%
+  mutate(vi = ((Review_Risk_Estimate_High - Review_Risk_Estimate_Low)/3.92)^2,
+         yi = Review_Risk_Estimate, 
+         Study_Year = as.numeric(Study_Year))%>%
+  select(Review_Author_Year, Study_Author_Year, yi, vi, Study_Year)%>%
+  arrange(Study_Author_Year)
+
+res<-rma(yi, vi, data=meta_df_sub[which(meta_df_sub$Review_Author_Year=="Allen,2013"),])
+summary(res)
+res<-rma(yi, vi, data=meta_df_sub[which(meta_df_sub$Review_Author_Year=="van der Mark,2012"),])
+summary(res)
+res<-rma(yi, vi, data=meta_df_sub[which(meta_df_sub$Review_Author_Year=="Breckenridge,2016"),])
+summary(res)
+
+meta::metagen(TE = yi,
+              seTE = sqrt(test$vi)/sqrt(test$Review_Total_N),
+              studlab = Study_Author_Year,
+              data = test,
+              sm = "OR",
+              transf=FALSE,
+              fixed = FALSE,
+              random = TRUE,
+              method.tau = "DL",
+              title = "Pesticides and Parkinson")
+
+meta::metagen(TE = Review_Risk_Estimate,
+              lower=Review_Risk_Estimate_Low,
+              upper=Review_Risk_Estimate_High, 
+              studlab = Study_Author_Year,
+              data = test,
+              sm = "OR",
+              transf=FALSE,
+              fixed = FALSE,
+              random = TRUE,
+              method.tau = "REML",
+              title = "Pesticides and Parkinson")
+meta::metagen(TE = Review_Risk_Estimate,
+              lower=Review_Risk_Estimate_Low,
+              upper=Review_Risk_Estimate_High, 
+              studlab = Study_Author_Year,
+              data = test,
+              sm = "OR",
+              transf=FALSE,
+              fixed = FALSE,
+              random = TRUE,
+              method.tau = "DL",
+              title = "Pesticides and Parkinson")
+meta::metagen(TE = Review_Risk_Estimate,
+              lower=Review_Risk_Estimate_Low,
+              upper=Review_Risk_Estimate_High, 
+              studlab = Study_Author_Year,
+              data = test,
+              sm = "OR",
+              transf=FALSE,
+              fixed = FALSE,
+              random = TRUE,
+              method.tau = "EB",
+              title = "Pesticides and Parkinson")
+meta::metagen(TE = Review_Risk_Estimate,
+              lower=Review_Risk_Estimate_Low,
+              upper=Review_Risk_Estimate_High, 
+              studlab = Study_Author_Year,
+              data = test,
+              sm = "OR",
+              transf=FALSE,
+              fixed = FALSE,
+              random = TRUE,
+              method.tau = "HS",
+              title = "Pesticides and Parkinson")
+
+res_meta_test<-meta::metagen(TE = Review_Risk_Estimate,
+                             lower=Review_Risk_Estimate_Low,
+                             upper=Review_Risk_Estimate_High, 
+                             studlab = Study_Author_Year,
+                             data = test,
+                             sm = "OR",
+                             transf=FALSE,
+                             fixed = FALSE,
+                             random = TRUE,
+                             method.tau = "DL",
+                             title = "Pesticides and Parkinson")
+summary(res_meta_test)
+meta::forest(res_meta_test, 
+             sortvar = TE,
+             prediction = TRUE, 
+             print.tau2 = TRUE,
+             leftlabs = c("Author", "g", "SE"))
+
+res_meta_test<-meta::metagen(TE = Review_Risk_Estimate,
+                             lower=Review_Risk_Estimate_Low,
+                             upper=Review_Risk_Estimate_High, 
+                             studlab = Study_Author_Year,
+                             data = test,
+                             sm = "OR",
+                             transf=FALSE,
+                             fixed = FALSE,
+                             random = TRUE,
+                             method.tau = "REML",
+                             title = "Pesticides and Parkinson")
+summary(res_meta_test)
+meta::forest(res_meta_test, 
+             sortvar = TE,
+             prediction = TRUE, 
+             print.tau2 = TRUE,
+             leftlabs = c("Author", "g", "SE"))
+meta::forest(res_meta, layout = "JAMA")
+
+
+
+
+df_pesticides<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+         !is.na(Review_Risk_Estimate_Low)|
+         !is.na(Review_Risk_Estimate_High))%>%
+  select(Review_Author_Year, Study_Author_Year, Study_Year, Study_Risk_Factor, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High, Study_Year, Review_Total_N, 
+         Study_Adjustments_Binary, Study_follow_up, NOS_Total_Study_Quality_Score, Measurement, Study_Country)%>%
+  mutate(vi = ((Review_Risk_Estimate_High-Review_Risk_Estimate_Low)/3.92)^2,
+         yi = Review_Risk_Estimate, 
+         Study_Year = as.numeric(Study_Year), 
+         NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  arrange(Study_Author_Year)
+nrow(df_pesticides)
+
+res_metafor<-rma(yi, vi, data=df_pesticides)
+summary(res_metafor)
+(res_metafor$tau2/(res_metafor$tau2 + res_metafor$vt))*100
+
+res_meta<-meta::metagen(TE = Review_Risk_Estimate,
+              lower=Review_Risk_Estimate_Low,
+              upper=Review_Risk_Estimate_High, 
+              studlab = Study_Author_Year,
+              data = df_pesticides,
+              #sm = "OR",
+              transf=FALSE,
+              fixed = FALSE,
+              random = TRUE,
+              #method.tau = "REML",
+              prediction=TRUE,
+              title = "Pesticides and Parkinson")
+summary(res_meta)
+((res_meta$Q - (res_meta$k.study-1)) / res_meta$Q)*100
+
+
+Hmisc::describe(df_pesticides$yi)
+Hmisc::describe(df_pesticides$vi)
+
+df_pesticides%>%
+  filter(vi>1000)%>%
+  select(Study_Author_Year, Review_Risk_Estimate, 
+         Review_Risk_Estimate_Low, Review_Risk_Estimate_High)
+
+df_pesticides%>%
+  mutate(label = case_when( vi>1000 ~ Study_Author_Year, 
+                            .default=""))%>% 
+  ggplot(aes(x=yi, y=log(vi)))+
+  geom_point(aes(x=yi, y=log(vi)))+
+  geom_text(aes(label=label))+
+  theme_bw()+
+  labs(y="Variance estimate (log scale)", 
+       x="Point estimate", 
+       title="Relationship between point estimate and variance estimate of odds-ratio", 
+       subtitle="For each study looking into pesticides as a risk factor for Parkinson", 
+       caption="The reason for placing the variance estimate on a log scale is because of two extreem values")
+  
+
+res<-rma(yi, vi, data=df_pesticides)
+summary(res)
+
+
+res.RE<-rma(yi=res_meta$TE, 
+            sei = res_meta$seTE, 
+            method=res_meta$method.tau, 
+            slab=res_meta$studlab)
+summary(res.RE)
+
+res_meta_review_uncommon<-update(res_meta, 
+                        subgroup=Review_Author_Year, 
+                        tau.common=FALSE, prediction=TRUE, 
+                        prediction.subgroup=TRUE)
+summary(res_meta_review_uncommon)
+forest(res_meta_review_uncommon)
+
+
+res_meta_vanmaelefabry<-meta::metagen(TE = Review_Risk_Estimate,
+                        lower=Review_Risk_Estimate_Low,
+                        upper=Review_Risk_Estimate_High, 
+                        studlab = Study_Author_Year,
+                        data = df_pesticides[df_pesticides$Review_Author_Year=="Van Maele-Fabry,2012", ],
+                        #sm = "OR",
+                        transf=FALSE,
+                        fixed = FALSE,
+                        random = TRUE,
+                        #method.tau = "REML",
+                        title = "Pesticides and Parkinson")
+summary(res_meta_vanmaelefabry)
+
+permres<-permutest(res.RE)
+permres
+plot(permres, xlim=c(-5,5))
+confint(res.RE, type="PL")
+
+sav <- baujat(res.RE, symbol=19, xlim=c(0,55))
+sav <- sav[sav$x >= 10 | sav$y >= 0.10,]
+text(sav$x, sav$y, sav$slab, pos=1, cex=0.8)
+
+#inf <- influence(res.RE)
+#par(mfrow=c(8,1))
+#plot(inf)
+
+df_pesticides%>%
+  filter(Study_Author_Year == "Golbe,1990")%>%
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Review_Author_Year, Study_Author_Year, Study_Year, Study_Risk_Factor, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High, Study_Year, Review_Total_N, 
+         Study_Adjustments_Binary, Study_follow_up, NOS_Total_Study_Quality_Score, Measurement, Study_Country)%>%
+  arrange(Study_Author_Year)%>%
+  filter(Study_Author_Year != "Golbe,1990")%>%
+  filter(Study_Author_Year != "Betterfield,1993")%>%
+  filter(Study_Author_Year != "Liou,1997")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = .,
+                #sm = "OR",
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                #method.tau = "REML",
+                prediction=TRUE,
+                title = "Pesticides and Parkinson")%>%
+  summary()
+  
+
+res_meta_egger<-eggers.test(res_meta)
+summary(res_meta_egger)
+regtest(res.RE)
+plot(res_meta_egger)
+funnel(res.RE, refline=0)
+funnel(res.RE, level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), refline=0, legend=TRUE)
+
+res_meta_trimfill<-trimfill(res_meta)
+summary(res_meta_trimfill)
+plot(res_meta_trimfill)
+
+taf <- trimfill(res.RE, estimator="R0")
+taf
+funnel(taf, legend=list(show="cis"))
+
+taf <- trimfill(res.RE)
+filled <- data.frame(yi = taf$yi, vi = taf$vi, fill = taf$fill)
+rma(yi, vi, data=filled)
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year)%>%
+  distinct()
+
+df_pesticides_distinct<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Year, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()
+nrow(df_pesticides_distinct)
+res_meta_distinct<-meta::metagen(TE = Review_Risk_Estimate,
+                                 lower=Review_Risk_Estimate_Low,
+                                 upper=Review_Risk_Estimate_High, 
+                                 studlab = Study_Author_Year,
+                                 data = df_pesticides_distinct,
+                                 #sm = "OR",
+                                 transf=FALSE,
+                                 fixed = FALSE,
+                                 random = TRUE,
+                                 #method.tau = "REML",
+                                 prediction = TRUE,
+                                 title = "Pesticides and Parkinson")
+summary(res_meta_distinct)
+
+res.RE_distinct<-rma(yi=res_meta_distinct$TE, 
+                     sei = res_meta_distinct$seTE, 
+                     method=res_meta_distinct$method.tau, 
+                     slab=res_meta_distinct$studlab)
+summary(res.RE_distinct)
+
+df_pesticides_distinct%>%
+  group_by(Study_Author_Year)%>%
+  select(Study_Author_Year)%>%
+  count()%>%
+  arrange(desc(n))
+
+df_pesticides_distinct%>%
+  filter(Study_Author_Year =="Hertzman,1994")
+df_pesticides_distinct%>%
+  filter(Study_Author_Year =="Elbaz,2009")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year =="Hertzman,1994")%>%
+  select(Review_Author_Year, Study_Risk_Factor, Dose, Sex, Measurement)%>%
+  arrange(Study_Risk_Factor)
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Study_Author_Year =="Hertzman,1994")%>%
+  select(Review_Author_Year, Study_Risk_Factor, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low)%>%
+  arrange(Study_Risk_Factor)
+
+df_pesticides_distinct_new<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()
+nrow(df_pesticides_distinct_new)
+
+df_pesticides_distinct_new%>%
+  summarise(n_distinct(Study_Risk_Factor))
+
+df_pesticides_distinct_new%>%
+  group_by(Study_Risk_Factor)%>%
+  select(Study_Risk_Factor)%>%
+  count()%>%
+  filter(n<2)%>%
+  print(n=33)
+
+df_pesticides_distinct_new%>%
+  group_by(Study_Risk_Factor)%>%
+  select(Study_Risk_Factor)%>%
+  count()%>%
+  print(n=51)
+
+df_pesticides_distinct_new%>%
+  group_by(Study_Risk_Factor)%>%
+  select(Study_Risk_Factor)%>%
+  mutate(col=Study_Risk_Factor)%>%
+  separate(col, into = c("first", "rest"), sep = "^\\S*\\K\\s+")%>%
+  ungroup()%>%
+  select(first)%>%
+  table()
+
+df_pesticides_distinct_new%>%
+  group_by(Study_Risk_Factor)%>%
+  select(Study_Risk_Factor)%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat=str_extract(Study_Risk_Factor, pattern="paraquat"))%>%
+  filter(!is.na(paraquat))
+
+df_pesticides_subgroup<-df_pesticides_distinct_new%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, 
+                Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()
+
+res_meta_pesticides_subgroup<-meta::metagen(TE = Review_Risk_Estimate,
+                                            lower=Review_Risk_Estimate_Low,
+                                            upper=Review_Risk_Estimate_High, 
+                                            studlab = Study_Author_Year,
+                                            data = df_pesticides_subgroup, 
+                                            subgroup=Pesticide_subgroup,
+                                            adhoc.hakn.ci ="ci",
+                                            method.predict = "HK",
+                                            adhoc.hakn.pi = "se",
+                                            tau.common=FALSE,
+                                            transf=FALSE,
+                                            fixed = FALSE,
+                                            random = TRUE,
+                                            null.effect = 1,
+                                            prediction=TRUE,
+                                            prediction.subgroup = TRUE,
+                                            title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_pesticides_subgroup)
+
+
+
+res_meta_paraquat<-meta::metagen(TE = Review_Risk_Estimate,
+                                 lower=Review_Risk_Estimate_Low,
+                                 upper=Review_Risk_Estimate_High, 
+                                 studlab = Study_Author_Year,
+                                 data = df_pesticides_subgroup[df_pesticides_subgroup$Pesticide_subgroup=="paraquat",],
+                                 adhoc.hakn.ci ="ci",
+                                 method.predict = "HK",
+                                 adhoc.hakn.pi = "se",
+                                 tau.common=FALSE,
+                                 transf=FALSE,
+                                 fixed = FALSE,
+                                 random = TRUE,
+                                 null.effect = 1,
+                                 title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_paraquat)
+meta::forest(res_meta_paraquat, 
+             sortvar = TE,
+             prediction = TRUE,
+             print.tau2 = TRUE,
+             layout = "RevMan5")
+sav <- baujat(res_meta_paraquat, symbol=19, xlim=c(0,55))
+sav <- sav[sav$x >= 10 | sav$y >= 0.10,]
+text(sav$x, sav$y, sav$slab, pos=1, cex=0.8)
+
+
+df_pesticides_distinct_new%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, 
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  filter(Study_Author_Year!="Engel,2001")%>%
+  filter(Study_Author_Year!="Liou,1997")%>%
+  filter(Study_Author_Year!="Firestone,2010")%>%
+  filter(Study_Author_Year!="NRD020,2009")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = .,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%meta::metagen(TE = Review_Risk_Estimate,
+                             lower=Review_Risk_Estimate_Low,
+                             upper=Review_Risk_Estimate_High, 
+                             studlab = Study_Author_Year,
+                             data = ., 
+                             subgroup=Review_Risk_Metric,
+                             adhoc.hakn.ci ="ci",
+                             method.predict = "HK",
+                             adhoc.hakn.pi = "se",
+                             tau.common=FALSE,
+                             transf=FALSE,
+                             fixed = FALSE,
+                             random = TRUE,
+                             null.effect = 1,
+                             prediction = TRUE,
+                             prediction.subgroup = TRUE,
+                             title = "Pesticides and Parkinson subgroup analysis")%>%
+  summary()
+
+
+res_meta_paraquat_subgroup<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  distinct()%>%meta::metagen(TE = Review_Risk_Estimate,
+                             lower=Review_Risk_Estimate_Low,
+                             upper=Review_Risk_Estimate_High, 
+                             studlab = Study_Author_Year,
+                             data = ., 
+                             subgroup=Review_Risk_Metric,
+                             adhoc.hakn.ci ="ci",
+                             method.predict = "HK",
+                             adhoc.hakn.pi = "se",
+                             tau.common=FALSE,
+                             transf=FALSE,
+                             fixed = FALSE,
+                             random = TRUE,
+                             null.effect = 1,                             ,
+                             prediction = TRUE,
+                             prediction.subgroup = TRUE,
+                             title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_paraquat_subgroup)
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  filter(Study_Author_Year!="Engel,2001")%>%
+  filter(Study_Author_Year!="Liou,1997")%>%
+  filter(Study_Author_Year!="Firestone,2010")%>%
+  filter(Study_Author_Year!="NRD020,2009")%>%
+  distinct()%>%meta::metagen(TE = Review_Risk_Estimate,
+                             lower=Review_Risk_Estimate_Low,
+                             upper=Review_Risk_Estimate_High, 
+                             studlab = Study_Author_Year,
+                             data = ., 
+                             subgroup=Review_Risk_Metric,
+                             adhoc.hakn.ci ="ci",
+                             method.predict = "HK",
+                             adhoc.hakn.pi = "se",
+                             tau.common=FALSE,
+                             transf=FALSE,
+                             fixed = FALSE,
+                             random = TRUE,
+                             null.effect = 1,                             ,
+                             prediction = TRUE,
+                             prediction.subgroup = TRUE,
+                             title = "Pesticides and Parkinson subgroup analysis")
+
+meta::forest(res_meta_paraquat_subgroup, 
+             sortvar = TE,
+             prediction = TRUE, 
+             print.tau2 = TRUE,
+             layout = "RevMan5")
+
+res_meta_metric_subgroup<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%meta::metagen(TE = Review_Risk_Estimate,
+                             lower=Review_Risk_Estimate_Low,
+                             upper=Review_Risk_Estimate_High, 
+                             studlab = Study_Author_Year,
+                             data = ., 
+                             subgroup=Review_Risk_Metric,
+                             adhoc.hakn.ci ="ci",
+                             method.predict = "HK",
+                             adhoc.hakn.pi = "se",
+                             tau.common=FALSE,
+                             transf=FALSE,
+                             fixed = FALSE,
+                             random = TRUE,
+                             null.effect = 1,
+                             predtcion=TRUE, 
+                             prediction.subgroup = TRUE,
+                             title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_metric_subgroup)
+
+res_meta_paraquat_subgroup_design<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,Study_Design,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Design,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                prediction=TRUE, 
+                prediction.subgroup = TRUE,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_paraquat_subgroup_design)
+meta::forest(res_meta_paraquat_subgroup_design, 
+             sortvar = TE,
+             prediction = TRUE, 
+             prediction.subgroup=TRUE,
+             print.tau2 = TRUE,
+             layout = "RevMan5")
+
+df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,Study_Design,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  #filter(Pesticide_subgroup=="paraquat")%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Design,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                prediction=TRUE, 
+                prediction.subgroup = TRUE,
+                title = "Pesticides and Parkinson subgroup analysis")
+
+
+res_meta_pesticides_subgroup_design<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,Study_Design,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="pesticide")%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Design,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1, 
+                prediction.subgroup = TRUE,
+                prediction=TRUE,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_pesticides_subgroup_design)
+
+
+res_meta_insecticides_subgroup_design<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,Study_Design,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="insecticide")%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Design,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1, 
+                prediction.subgroup = TRUE,
+                prediction=TRUE,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_insecticides_subgroup_design)
+
+res_meta_fungicides_subgroup_design<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,Study_Design,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="fungicide")%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Design,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1, 
+                prediction.subgroup = TRUE,
+                prediction=TRUE,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_fungicides_subgroup_design)
+
+res_meta_occupation_subgroup_design<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric, Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Review_Risk_Metric,Study_Design,
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  filter(Pesticide_subgroup=="occupation")%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Design,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1, 
+                prediction.subgroup = TRUE,
+                prediction=TRUE,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_occupation_subgroup_design)
+
+
+res_meta_study_year<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_study_year_reg<-metareg(res_meta_study_year, ~Study_Year)
+summary(res_meta_study_year_reg)
+bubble(res_meta_study_year_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's")
+
+
+res_meta_NOS<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, NOS_Total_Study_Quality_Score, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor), 
+         NOS_Total_Study_Quality_Score = as.numeric(NOS_Total_Study_Quality_Score))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, NOS_Total_Study_Quality_Score, 
+                  Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  filter(!is.na(NOS_Total_Study_Quality_Score))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_NOS_reg<-metareg(res_meta_NOS, ~NOS_Total_Study_Quality_Score)
+summary(res_meta_NOS_reg)
+bubble(res_meta_NOS_reg, col.line = "blue", 
+       studlab = FALSE, xlab="NOS Total quality score",ylab="Odds-or Risk-Ratio's")
+
+
+res_meta_subgroup_adjustment<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor,Study_Adjustments_Binary, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Study_Adjustments_Binary,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_subgroup_adjustment)
+
+res_meta_adjust<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor,Study_Adjustments, 
+         Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  filter(!is.na(Study_Adjustments))%>%
+  mutate(adjustments = str_count(Study_Adjustments, ",")+1)%>%
+  distinct()%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+summary(res_meta_adjust)
+res_meta_adjustment_reg<-metareg(res_meta_adjust, ~adjustments)
+summary(res_meta_adjustment_reg)
+bubble(res_meta_adjustment_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Number of confounders included",ylab="Odds-or Risk-Ratio's")
+
+
+
+res_meta_study_year_paraquat<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_paraquat_study_year_reg<-metareg(res_meta_study_year_paraquat, ~Study_Year)
+summary(res_meta_paraquat_study_year_reg)
+bubble(res_meta_paraquat_study_year_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Paraquat")
+regplot(res_meta_paraquat_study_year_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Paraquat",
+        main="Meta-regression of Study Year for Paraquat",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+res_meta_study_year_insecticides<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  filter(Pesticide_subgroup=="insecticide")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_insecticides_study_year_reg<-metareg(res_meta_study_year_insecticides, ~Study_Year)
+summary(res_meta_insecticides_study_year_reg)
+bubble(res_meta_insecticides_study_year_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Insecticides")
+regplot(res_meta_insecticides_study_year_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Insecticides",
+        main="Meta-regression of Study Year for Insecticides",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+res_meta_study_year_pesticides<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  filter(Pesticide_subgroup=="pesticide")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_pesticide_study_year_reg<-metareg(res_meta_study_year_pesticides, ~Study_Year)
+summary(res_meta_pesticide_study_year_reg)
+bubble(res_meta_pesticide_study_year_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Pesticides")
+regplot(res_meta_pesticide_study_year_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Pesticides",
+        main="Meta-regression of Study Year for Pesticides",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+
+
+
+res_meta_study_year_occupation<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, Study_Year, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(Study_Design))%>%
+  filter(Pesticide_subgroup=="occupation")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_occupation_study_year_reg<-metareg(res_meta_study_year_occupation, ~Study_Year)
+summary(res_meta_occupation_study_year_reg)
+bubble(res_meta_occupation_study_year_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Occupation")
+regplot(res_meta_occupation_study_year_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Occupation",
+        main="Meta-regression of Study Year for Occupation",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+
+res_meta_adjustment_paraquat<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Adjustments, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  filter(!is.na(Study_Adjustments))%>%
+  mutate(adjustments = str_count(Study_Adjustments, ",")+1)%>%
+  select(-Study_Adjustments)%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, adjustments, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(adjustments))%>%
+  filter(Pesticide_subgroup=="paraquat")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_paraquat_adjustment_reg<-metareg(res_meta_adjustment_paraquat, ~adjustments)
+summary(res_meta_paraquat_adjustment_reg)
+bubble(res_meta_paraquat_adjustment_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Paraquat")
+regplot(res_meta_paraquat_adjustment_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Paraquat",
+        main="Meta-regression of number of confounders included for Paraquat",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+
+
+
+res_meta_adjustment_pesticides<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Adjustments, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  filter(!is.na(Study_Adjustments))%>%
+  mutate(adjustments = str_count(Study_Adjustments, ",")+1)%>%
+  select(-Study_Adjustments)%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, adjustments, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(adjustments))%>%
+  filter(Pesticide_subgroup=="pesticide")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_pesticides_adjustment_reg<-metareg(res_meta_adjustment_pesticides, ~adjustments)
+summary(res_meta_pesticides_adjustment_reg)
+bubble(res_meta_pesticides_adjustment_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Pesticides")
+regplot(res_meta_pesticides_adjustment_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Paraquat",
+        main="Meta-regression of number of confounders included for Pesticides",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+res_meta_adjustment_insecticides<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Adjustments, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  filter(!is.na(Study_Adjustments))%>%
+  mutate(adjustments = str_count(Study_Adjustments, ",")+1)%>%
+  select(-Study_Adjustments)%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, adjustments, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(adjustments))%>%
+  filter(Pesticide_subgroup=="insecticide")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_insecticide_adjustment_reg<-metareg(res_meta_adjustment_insecticides, ~adjustments)
+summary(res_meta_insecticide_adjustment_reg)
+bubble(res_meta_insecticide_adjustment_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Insecticides")
+regplot(res_meta_insecticide_adjustment_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Paraquat",
+        main="Meta-regression of number of confounders included for Insecticides",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+
+res_meta_adjustment_occupation<-df%>%
+  filter(Review_Risk_Factors =="Pesticides")%>%
+  filter(Review_Risk_Metric !="SMD" & 
+           Review_Risk_Metric !="WMD" & 
+           Review_Risk_Metric !="SMR" & 
+           Review_Risk_Metric !="SIR" )%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  select(Study_Author_Year, Study_Risk_Factor, Study_Adjustments, 
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  filter(!is.na(Study_Adjustments))%>%
+  mutate(adjustments = str_count(Study_Adjustments, ",")+1)%>%
+  select(-Study_Adjustments)%>%
+  mutate(Study_Risk_Factor = str_to_lower(Study_Risk_Factor))%>%
+  mutate(paraquat   = str_extract(Study_Risk_Factor, pattern="paraquat"), 
+         herbicides = str_extract(Study_Risk_Factor, pattern="herbicide"), 
+         insecticides = str_extract(Study_Risk_Factor, pattern="insecticide"),
+         pesticides = str_extract(Study_Risk_Factor, pattern="pesticide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         fungicides = str_extract(Study_Risk_Factor, pattern="fungicide"),
+         occupation = str_extract(Study_Risk_Factor, pattern="occupation"))%>%
+  pivot_longer(!c(Study_Author_Year, Study_Risk_Factor, adjustments, 
+                  Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+                  Review_Risk_Estimate_High), 
+               names_to="Extract", 
+               values_to="Pesticide_subgroup")%>%
+  filter(!is.na(Pesticide_subgroup))%>%
+  select(-c(Extract, Study_Risk_Factor))%>%
+  distinct()%>%
+  filter(!is.na(adjustments))%>%
+  filter(Pesticide_subgroup=="occupation")%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                title = "Pesticides and Parkinson subgroup analysis")
+res_meta_occupation_adjustment_reg<-metareg(res_meta_adjustment_occupation, ~adjustments)
+summary(res_meta_occupation_adjustment_reg)
+bubble(res_meta_occupation_adjustment_reg, col.line = "blue", 
+       studlab = FALSE, xlab="Study Year",ylab="Odds-or Risk-Ratio's for Occupation")
+regplot(res_meta_occupation_adjustment_reg,
+        xlab="Study Year",ylab="Odds-or Risk-Ratio's for Occupation",
+        main="Meta-regression of number of confounders included for Occupation",
+        digits=1, las=1, bty="l",labsize=0.9, legend=TRUE, refline=1,
+        pi=TRUE)
+
+df%>%
+  summarise_all(n_distinct(Review_Risk_Factors))
+
+df%>%
+  select(Study_Author_Year, Review_Risk_Factors,
+         Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  filter(Review_Risk_Estimate_Low>Review_Risk_Estimate_High)
+
+df%>%
+  filter(Review_Risk_Metric =="OR" |
+           Review_Risk_Metric =="RR")%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  filter(is.na(Dose))%>%
+  select(Study_Author_Year, Review_Risk_Factors,Study_Risk_Factor,
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  select(Review_Risk_Factors)%>%
+  distinct()%>%
+  count()
+  
+res_meta_ALL_OR_RR<-df%>%
+  filter(Review_Risk_Metric =="OR" |
+           Review_Risk_Metric =="RR")%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  filter(is.na(Dose))%>%
+  select(Study_Author_Year, Review_Risk_Factors,Study_Risk_Factor,
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  distinct()%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Review_Risk_Factors,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                prediction=TRUE, 
+                prediction.subgroup = TRUE,
+                title = "Risk factor for Parkinson subgroup analysis")
+summary(res_meta_ALL_OR_RR)
+
+
+df_meta<-data_frame(yi = res_meta_ALL_OR_RR$TE,
+                    vi = res_meta_ALL_OR_RR$seTE, 
+                    subgroup = res_meta_ALL_OR_RR$subgroup)
+table(df_meta$subgroup)
+df_meta%>%
+  mutate(label   = if_else(vi>30, subgroup, NA))%>%
+  ggplot(aes(yi, vi))+
+  geom_point(aes(col=subgroup),show.legend = FALSE)+
+  geom_text(aes(label=label))+
+  theme_bw()+
+  labs(x="Point estimates", 
+       y="Variance estimates", 
+       col="Risk factor", 
+       label="Risk factor", 
+       title="Relationship between point estimates and variance estimates for risk factors for Parkinson", 
+       subtitle="Labeled points have variance estimates larger then 30")
+
+
+df_meta_subgroup<-data_frame(subgroup=res_meta_ALL_OR_RR$subgroup.levels, 
+                             estimate=res_meta_ALL_OR_RR$TE.random.w, 
+                             estimate_lower=res_meta_ALL_OR_RR$lower.random.w,
+                             estimate_higher=res_meta_ALL_OR_RR$upper.random.w,
+                             I2=res_meta_ALL_OR_RR$I2.w,
+                             I2_lower=res_meta_ALL_OR_RR$lower.I2.w,
+                             I2_higher=res_meta_ALL_OR_RR$upper.I2.w,
+                             K = res_meta_ALL_OR_RR$k.study.w, 
+                             pred_lower = res_meta_ALL_OR_RR$lower.predict.w,
+                             pred_higher = res_meta_ALL_OR_RR$upper.predict.w)
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  ggplot(aes(x=estimate, 
+             y=I2))+
+  geom_point(aes(col=I2_spread, size=K))+
+  scale_color_viridis_c(option="turbo")+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point estimate for an odds-or risk-ratio", 
+       y=expression(I^2 ~ "statistic"),
+       size="Number of studes per subgroup",
+       col=expression(I^2 ~ "spread"),
+       title=expression("Relationship between point estimates," ~ I^2 ~ "statistic" ~ 
+                          "number of studies per subgroup and the" ~ I^2 ~ "statistic" ~ "spread"))
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  ggplot(aes(x=estimate, 
+             y=I2))+
+  geom_point(aes(col=I2_spread, size=K))+
+  scale_color_viridis_c(option="turbo")+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point estimate for an odds-or risk-ratio", 
+       y=expression(I^2 ~ "statistic"),
+       size="Number of studes per subgroup",
+       col=expression(I^2 ~ "spread"),
+       title=expression("Relationship between point estimates," ~ I^2 ~ "statistic" ~ 
+                          "number of studies per subgroup and the" ~ I^2 ~ "statistic" ~ "spread"))
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  ggplot(aes(y=reorder(subgroup, I2), x=I2))+
+  geom_point()+
+  geom_pointrange(aes(xmin=I2_lower, 
+                      xmax=I2_higher, 
+                      col=I2_spread))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  scale_color_viridis_c(option="turbo")+
+  labs(y="Subgroup", 
+       x=expression(I^2 ~ "estimate"), 
+       col=expression(I^2 ~ "spread"), 
+       title=expression("Relationship between " ~ I^2 ~ "estimates" ~ 
+                          "number of studies per subgroup and the" ~ I^2 ~ "statistic" ~ "spread across subgroups"))
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  ggplot(aes(y=reorder(subgroup, I2_spread), x=I2))+
+  geom_point()+
+  geom_pointrange(aes(xmin=I2_lower, 
+                      xmax=I2_higher, 
+                      col=I2_spread))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  scale_color_viridis_c(option="turbo")+
+  labs(y="Subgroup", 
+       x=expression(I^2 ~ "estimate"), 
+       col=expression(I^2 ~ "spread"), 
+       title=expression("Relationship between " ~ I^2 ~ "estimates" ~ 
+                          "number of studies per subgroup and the" ~ I^2 ~ "statistic" ~ "spread across subgroups"))
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  ggplot(aes(x=I2, y=I2_spread))+
+  geom_smooth(colour="black", fill="darkgrey", alpha=0.1, size=0.5)+
+  geom_point(aes(col=estimate, size=K))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  scale_color_viridis_c(option="turbo")+
+  labs(y=expression(I^2 ~ "spread"), 
+       x=expression(I^2 ~ "estimate"), 
+       col="Point estimate of ratio's", 
+       title=expression("Relationship between " ~ I^2 ~ "estimates" ~ 
+                          "number of studies per subgroup and the" ~ I^2 ~ "statistic" ~ "spread across subgroups"))
+
+df_meta_subgroup%>%
+  print(n=90)
+
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  print(n=90)
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  select(subgroup, I2, I2_spread, I2_CV, K)%>%
+  arrange(I2)%>%
+  print(n=47)
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(Significant = case_when(
+    estimate > 1 & estimate_lower  > 1 & estimate_higher > 1 ~ 'Yes', 
+    estimate < 1 & estimate_higher < 1 & estimate_lower < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(y=reorder(subgroup, estimate), x=estimate, col=Significant))+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_point(aes(size=I2))+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       col="Statistically signifcant summary estimate", 
+       size=expression(I^2 ~ "estimate"), 
+       title="Risk estimates for each risk factor in relationship to Parkinson", 
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%"))
+
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(SignificantI2 = case_when(
+    between(I2, 0, 0.249) ~ 'Low',
+    between(I2, 0.25, 0.499) ~ 'Moderate',
+    between(I2, 0.5, 0.749) ~ 'Substantial',
+    between(I2, 0.75, 1) ~ 'High', 
+    TRUE ~ ""))%>%
+  ggplot(aes(y=reorder(subgroup, I2), x=estimate, col=I2))+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_point(aes(size=K))+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  scale_color_viridis_c(option="turbo")+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       size="Number of studies included", 
+       col=expression(I^2 ~ "estimate"), 
+       title="Risk estimates for each risk factor in relationship to Parkinson", 
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%"))
+
+df_meta_subgroup%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(SignificantI2 = case_when(
+    between(I2, 0, 0.5) ~ 'Low',
+    between(I2, 0.501, 1) ~ 'High', 
+    TRUE ~ ""))%>%
+  ggplot(aes(y=reorder(subgroup, I2), x=estimate, col=SignificantI2))+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_point(aes(size=K))+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       size="Number of studies included", 
+       col=expression(I^2 ~ "estimate"), 
+       title="Risk estimates for each risk factor in relationship to Parkinson", 
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%. A 'High' estimate for heterogeneity is a value >50%"))
+
+
+df_meta_subgroup%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(Significant = case_when(
+    pred_lower  > 1 & pred_higher > 1 ~ 'Yes', 
+    pred_higher < 1 & pred_lower < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  ggplot(aes(y=reorder(subgroup, estimate), x=estimate, col=Significant))+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher))+
+  geom_pointrange(aes(xmin=pred_lower, 
+                      xmax=pred_higher), alpha=0.4)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       col="Statistically signifcant prediction estimate", 
+       size=expression(I^2 ~ "estimate"), 
+       title="Risk estimates and 95% prediction intervals for each risk factor in relationship to Parkinson",
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%"))
+
+res_meta_ALL_OR_RR_cohort<-df%>%
+  filter(Review_Risk_Metric =="OR" |
+           Review_Risk_Metric =="RR")%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  filter(is.na(Dose))%>%
+  select(Study_Author_Year, Review_Risk_Factors,Study_Risk_Factor,
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  filter(Study_Design=="Cohort")%>%
+  distinct()%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Review_Risk_Factors,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                prediction = TRUE,
+                prediction.subgroup = TRUE,
+                title = "Risk factor for Parkinson subgroup analysis")
+summary(res_meta_ALL_OR_RR_cohort)
+df_meta_subgroup_cohort<-data_frame(subgroup=res_meta_ALL_OR_RR_cohort$subgroup.levels, 
+                             estimate=res_meta_ALL_OR_RR_cohort$TE.random.w, 
+                             estimate_lower=res_meta_ALL_OR_RR_cohort$lower.random.w,
+                             estimate_higher=res_meta_ALL_OR_RR_cohort$upper.random.w,
+                             I2=res_meta_ALL_OR_RR_cohort$I2.w,
+                             I2_lower=res_meta_ALL_OR_RR_cohort$lower.I2.w,
+                             I2_higher=res_meta_ALL_OR_RR_cohort$upper.I2.w,
+                             K = res_meta_ALL_OR_RR_cohort$k.study.w, 
+                             pred_lower = res_meta_ALL_OR_RR_cohort$lower.predict.w,
+                             pred_higher = res_meta_ALL_OR_RR_cohort$upper.predict.w,
+                             Study_Design="Cohort")
+res_meta_ALL_OR_RR_case_control<-df%>%
+  filter(Review_Risk_Metric =="OR" |
+           Review_Risk_Metric =="RR")%>%
+  filter(!is.na(Review_Risk_Estimate)|
+           !is.na(Review_Risk_Estimate_Low)|
+           !is.na(Review_Risk_Estimate_High))%>%
+  filter(is.na(Dose))%>%
+  select(Study_Author_Year, Review_Risk_Factors,Study_Risk_Factor,
+         Study_Design, Review_Risk_Estimate, Review_Risk_Estimate_Low, 
+         Review_Risk_Estimate_High)%>%
+  filter(Study_Design=="Case control")%>%
+  distinct()%>%
+  meta::metagen(TE = Review_Risk_Estimate,
+                lower=Review_Risk_Estimate_Low,
+                upper=Review_Risk_Estimate_High, 
+                studlab = Study_Author_Year,
+                data = ., 
+                subgroup=Review_Risk_Factors,
+                adhoc.hakn.ci ="ci",
+                method.predict = "HK",
+                adhoc.hakn.pi = "se",
+                tau.common=FALSE,
+                transf=FALSE,
+                fixed = FALSE,
+                random = TRUE,
+                null.effect = 1,
+                prediction=TRUE, 
+                prediction.subgroup = TRUE,
+                title = "Risk factor for Parkinson subgroup analysis")
+summary(res_meta_ALL_OR_RR_case_control)
+df_meta_subgroup_case_control<-data_frame(subgroup=res_meta_ALL_OR_RR_case_control$subgroup.levels, 
+                                    estimate=res_meta_ALL_OR_RR_case_control$TE.random.w, 
+                                    estimate_lower=res_meta_ALL_OR_RR_case_control$lower.random.w,
+                                    estimate_higher=res_meta_ALL_OR_RR_case_control$upper.random.w,
+                                    I2=res_meta_ALL_OR_RR_case_control$I2.w,
+                                    I2_lower=res_meta_ALL_OR_RR_case_control$lower.I2.w,
+                                    I2_higher=res_meta_ALL_OR_RR_case_control$upper.I2.w,
+                                    K = res_meta_ALL_OR_RR_case_control$k.study.w,
+                                    pred_lower = res_meta_ALL_OR_RR_case_control$lower.predict.w,
+                                    pred_higher = res_meta_ALL_OR_RR_case_control$upper.predict.w,
+                                    Study_Design="Case control")
+df_meta_subgroup_study_design=rbind(df_meta_subgroup_case_control, 
+                                    df_meta_subgroup_cohort)
+df_meta_subgroup_study_design
+
+
+df_meta_subgroup_study_design%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  group_by(subgroup)%>%
+  select(Study_Design, I2, I2_spread, I2_CV, K)%>%
+  arrange(subgroup,Study_Design)%>%
+  print(n=47)
+
+df_meta_subgroup_study_design%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(Significant = case_when(
+    estimate > 1 & estimate_lower  > 1 & estimate_higher > 1 ~ 'Yes', 
+    estimate < 1 & estimate_higher < 1 & estimate_lower < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(SignificantI2 = case_when(
+    between(I2, 0, 0.500) ~ 'Low',
+    between(I2, 0.500, 1) ~ 'High', 
+    TRUE ~ ""))%>%
+  ggplot(aes(y=reorder(subgroup, estimate), x=estimate, col=Significant, shape=Study_Design), alpha=0.8)+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_point(aes(size=I2))+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher), 
+                  position=position_dodge(0.15))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       col="Statistically signifcant summary estimate", 
+       shape="Study Design",
+       size=expression(I^2 ~ "estimate"), 
+       title="Risk estimates for each risk factor in relationship to Parkinson", 
+       subtitle="per study design",
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%"))
+
+
+df_meta_subgroup_study_design%>%
+  filter(subgroup=="Ulcerative colitis")
+
+df_meta_subgroup_study_design%>%
+  mutate(I2_spread = I2_higher- I2_lower)%>%
+  filter(I2>0)%>%
+  mutate(I2_CV = I2_spread/I2)%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(Significant = case_when(
+    estimate > 1 & estimate_lower  > 1 & estimate_higher > 1 ~ 'Yes', 
+    estimate < 1 & estimate_higher < 1 & estimate_lower < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+  mutate(SignificantI2 = case_when(
+    between(I2, 0, 0.500) ~ 'Low',
+    between(I2, 0.500, 1) ~ 'High', 
+    TRUE ~ ""))%>%
+  ggplot(aes(y=reorder(subgroup, estimate), x=estimate, col=SignificantI2, shape=Study_Design), alpha=0.8)+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_point(aes(size=K))+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher), 
+                  position=position_dodge(0.15))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       size="Number of studies included", 
+       shape="Study Design",
+       col=expression(I^2 ~ "estimate"), 
+       title="Risk estimates for each risk factor in relationship to Parkinson", 
+       subtitle="per study design",
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%"))
+
+df_meta_subgroup_study_design%>%
+  filter(between(I2, 0.2, 0.8))%>%
+  filter(K>=10)%>%
+  mutate(Significant = case_when(
+    pred_lower  > 1 & pred_higher > 1 ~ 'Yes', 
+    pred_higher < 1 & pred_lower < 1 ~ 'Yes', 
+    TRUE ~ 'No'))%>%
+   mutate(SignificantI2 = case_when(
+    between(I2, 0, 0.500) ~ 'Low',
+    between(I2, 0.500, 1) ~ 'High', 
+    TRUE ~ ""))%>%
+  ggplot(aes(y=reorder(subgroup, estimate), 
+             x=estimate, col=Significant, shape=Study_Design), alpha=0.8)+
+  geom_vline(xintercept = 1, col="black", lty=2)+
+  geom_point(aes(size=I2))+
+  geom_pointrange(aes(xmin=estimate_lower, 
+                      xmax=estimate_higher), 
+                  position=position_dodge(0.15))+
+  geom_pointrange(aes(xmin=pred_lower, 
+                      xmax=pred_higher), alpha=0.4)+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  facet_grid(~Study_Design)+
+  labs(x="Point Estimate", 
+       y="Risk factor", 
+       col="Statistically signifcant summary estimate", 
+       shape="Study Design",
+       size=expression(I^2 ~ "estimate"), 
+       title="Risk estimates and 95% prediction intervals for each risk factor in relationship to Parkinson", 
+       subtitle="per study design",
+       caption=expression("List of subgroups was derived by selecting subgroups with at least 10 studies included and an " ~ I^2 ~ "estimate" ~ "between 20% and 80%"))
+
+
+
+
+
+
+
+
+
+
+
+
