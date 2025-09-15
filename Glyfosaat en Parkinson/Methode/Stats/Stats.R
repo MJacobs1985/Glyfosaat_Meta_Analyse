@@ -14,7 +14,7 @@ library(meta)
 library(dmetar)
 
 #### LOAD AND WRANGLE DATA ----
-df <- read_excel("~/MSJ/Projects/2025/STAF/Glyfosaat en Parkinson/Methode/Data/Data_extracted.xlsx")
+df <- read_excel("~/Glyfosaat en Parkinson/Methode/Data/Data_extracted.xlsx")
 colnames(df) = gsub(" ", "_", colnames(df))
 colnames(df)
 sapply(df, class)
